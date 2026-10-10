@@ -26,27 +26,26 @@ class MainActivity : AppCompatActivity() {
 
     // Lắng nghe sự kiện thay đổi trạng thái hoặc mức pin Bluetooth
     private val bluetoothReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                BluetoothDevice.ACTION_BATTERY_LEVEL_CHANGED -> {
-                    val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                    val batteryLevel = intent.getIntExtra(BluetoothDevice.EXTRA_BATTERY_LEVEL, -1)
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED" -> {
+                val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                val batteryLevel = intent.getIntExtra("android.bluetooth.device.EXTRA_BATTERY_LEVEL", -1)
+                
+                if (batteryLevel != -1) {
+                    Toast.makeText(context, "${device?.name ?: "Tai nghe"} - Pin: $batteryLevel%", Toast.LENGTH_SHORT).show()
                     
-                    if (batteryLevel != -1) {
-                        Toast.makeText(context, "${device?.name ?: "Tai nghe"} - Pin: $batteryLevel%", Toast.LENGTH_SHORT).show()
-                        
-                        // Kích hoạt hiển thị Service Pop-up khi nhận được pin
-                        val serviceIntent = Intent(context, PopupService::class.java)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            context.startForegroundService(serviceIntent)
-                        } else {
-                            context.startService(serviceIntent)
-                        }
+                    val serviceIntent = Intent(context, PopupService::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
+                    } else {
+                        context.startService(serviceIntent)
                     }
                 }
             }
         }
     }
+}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,8 +62,8 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         // Đăng ký bộ lọc lắng nghe sự kiện pin Bluetooth
-        val filter = IntentFilter(BluetoothDevice.ACTION_BATTERY_LEVEL_CHANGED)
-        registerReceiver(bluetoothReceiver, filter)
+        val filter = IntentFilter("android.bluetooth.device.action.BATTERY_LEVEL_CHANGED")
+registerReceiver(bluetoothReceiver, filter)
     }
 
     override fun onPause() {
