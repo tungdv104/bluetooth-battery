@@ -2,17 +2,20 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:background="@drawable/popup_bg"
+    android:background="@android:color/black"
+    android:alpha="0.85"
     android:orientation="horizontal"
-    android:padding="16px">
+    android:padding="16dp"
+    android:gravity="center">
 
-    <!-- Bên trái (Left) -->
+    <!-- 1. Tai nghe bên trái (Left) -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="8px">
+        android:layout_marginEnd="12dp">
+
         <TextView
             android:layout_width="60dp"
             android:layout_height="60dp"
@@ -20,22 +23,27 @@
             android:gravity="center"
             android:text="L"
             android:textColor="#FFFFFF"
-            android:textStyle="bold"/>
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
         <TextView
-            android:id="@+text/txtLeftBattery"
+            android:id="@+id/txtLeftBattery"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Left: 100%"
-            android:textColor="#FFFFFF" />
+            android:layout_marginTop="6dp"
+            android:text="100%"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
     </LinearLayout>
 
-    <!-- Hộp sạc (Case) -->
+    <!-- 2. Hộp sạc (Case) -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="8px">
+        android:layout_marginEnd="12dp">
+
         <TextView
             android:layout_width="60dp"
             android:layout_height="60dp"
@@ -43,13 +51,44 @@
             android:gravity="center"
             android:text="Case"
             android:textColor="#FFFFFF"
-            android:textStyle="bold"/>
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
         <TextView
-            android:id="@+text/txtCaseBattery"
+            android:id="@+id/txtCaseBattery"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Case: 91%"
-            android:textColor="#FFFFFF" />
+            android:layout_marginTop="6dp"
+            android:text="91%"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- 3. Tai nghe bên phải (Right) -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:background="@drawable/circle_progress"
+            android:gravity="center"
+            android:text="R"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/txtRightBattery"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="100%"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
     </LinearLayout>
 
 </LinearLayout>
