@@ -21,6 +21,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- BỔ SUNG KHAI BÁO SERVICE NÀY VÀO -->
+        <service 
+            android:name=".PopupService"
+            android:exported="false" />
+
     </application>
 
 </manifest>
