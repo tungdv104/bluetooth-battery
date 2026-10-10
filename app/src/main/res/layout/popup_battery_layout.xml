@@ -3,12 +3,12 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:background="@android:color/black"
-    android:alpha="0.85"
+    android:alpha="0.9"
     android:orientation="horizontal"
     android:padding="16dp"
     android:gravity="center">
 
-    <!-- 1. Tai nghe bên trái (Left) -->
+    <!-- 1. Tai nghe Trái (L) -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -16,24 +16,25 @@
         android:orientation="vertical"
         android:layout_marginEnd="12dp">
 
-        <TextView
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:background="@drawable/circle_progress"
-            android:gravity="center"
-            android:text="L"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+        <ProgressBar
+            android:id="@+id/progressLeft"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="65dp"
+            android:layout_height="65dp"
+            android:indeterminate="false"
+            android:max="100"
+            android:progress="80"
+            android:progressDrawable="@drawable/circle_progress"
+            android:background="@drawable/circle_background" />
 
         <TextView
             android:id="@+id/txtLeftBattery"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="100%"
+            android:text="L: 80%"
             android:textColor="#FFFFFF"
-            android:textSize="14sp" />
+            android:textSize="13sp" />
     </LinearLayout>
 
     <!-- 2. Hộp sạc (Case) -->
@@ -44,51 +45,53 @@
         android:orientation="vertical"
         android:layout_marginEnd="12dp">
 
-        <TextView
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:background="@drawable/circle_progress"
-            android:gravity="center"
-            android:text="Case"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+        <ProgressBar
+            android:id="@+id/progressCase"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="65dp"
+            android:layout_height="65dp"
+            android:indeterminate="false"
+            android:max="100"
+            android:progress="91"
+            android:progressDrawable="@drawable/circle_progress"
+            android:background="@drawable/circle_background" />
 
         <TextView
             android:id="@+id/txtCaseBattery"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="91%"
+            android:text="Case: 91%"
             android:textColor="#FFFFFF"
-            android:textSize="14sp" />
+            android:textSize="13sp" />
     </LinearLayout>
 
-    <!-- 3. Tai nghe bên phải (Right) -->
+    <!-- 3. Tai nghe Phải (R) -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="vertical">
 
-        <TextView
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:background="@drawable/circle_progress"
-            android:gravity="center"
-            android:text="R"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+        <ProgressBar
+            android:id="@+id/progressRight"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="65dp"
+            android:layout_height="65dp"
+            android:indeterminate="false"
+            android:max="100"
+            android:progress="100"
+            android:progressDrawable="@drawable/circle_progress"
+            android:background="@drawable/circle_background" />
 
         <TextView
             android:id="@+id/txtRightBattery"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="100%"
+            android:text="R: 100%"
             android:textColor="#FFFFFF"
-            android:textSize="14sp" />
+            android:textSize="13sp" />
     </LinearLayout>
 
 </LinearLayout>
