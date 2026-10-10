@@ -3,6 +3,10 @@ package com.example.btbattery
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -20,6 +24,30 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: ArrayAdapter<String>
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
 
+    // Lắng nghe sự kiện thay đổi trạng thái hoặc mức pin Bluetooth
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                BluetoothDevice.ACTION_BATTERY_LEVEL_CHANGED -> {
+                    val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    val batteryLevel = intent.getIntExtra(BluetoothDevice.EXTRA_BATTERY_LEVEL, -1)
+                    
+                    if (batteryLevel != -1) {
+                        Toast.makeText(context, "${device?.name ?: "Tai nghe"} - Pin: $batteryLevel%", Toast.LENGTH_SHORT).show()
+                        
+                        // Kích hoạt hiển thị Service Pop-up khi nhận được pin
+                        val serviceIntent = Intent(context, PopupService::class.java)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            context.startForegroundService(serviceIntent)
+                        } else {
+                            context.startService(serviceIntent)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -30,6 +58,18 @@ class MainActivity : AppCompatActivity() {
         listView.adapter = adapter
 
         checkPermissionsAndLoadDevices()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Đăng ký bộ lọc lắng nghe sự kiện pin Bluetooth
+        val filter = IntentFilter(BluetoothDevice.ACTION_BATTERY_LEVEL_CHANGED)
+        registerReceiver(bluetoothReceiver, filter)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterReceiver(bluetoothReceiver)
     }
 
     private fun checkPermissionsAndLoadDevices() {
@@ -54,14 +94,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         try {
-            // Lấy danh sách các thiết bị đã ghép nối/kết nối
             val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter.bondedDevices
             deviceList.clear()
             
             pairedDevices?.forEach { device ->
                 val name = device.name ?: "Unknown"
                 val address = device.address
-                // Lưu ý: % pin chi tiết lấy trực tiếp qua phản hồi hệ thống audio profile (A2DP/HFP)
                 deviceList.add("Tên: $name\nMac: $address")
             }
             
