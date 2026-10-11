@@ -317,8 +317,8 @@ class MainActivity : AppCompatActivity() {
         if (!::list.isInitialized) return
 
         runOnUiThread {
-            while (list.childCount > 5) {
-                list.removeViewAt(5)
+            while (list.childCount > 6) {
+                list.removeViewAt(6)
             }
 
             statusView.text = when {
