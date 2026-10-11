@@ -1,3 +1,4 @@
+
 package com.example.btbattery
 
 import android.app.Notification
@@ -11,43 +12,79 @@ import androidx.core.app.NotificationCompat
 
 class PopupService : Service() {
 
-    private val CHANNEL_ID = "BtBatteryChannel"
-
-    override fun onBind(intent: Intent?): IBinder? = null
+    companion object {
+        private const val CHANNEL_ID = "BtBatteryChannel"
+        private const val NOTIFICATION_ID = 1
+    }
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
 
-        // Tạo thông báo hiển thị lên thanh trạng thái (Notification bar)
-        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Pin Tai Nghe Bluetooth")
-            .setContentText("L: 80% | Case: 91% | R: 100%")
-            .setSmallIcon(android.R.drawable.ic_menu_info_details)
-            .setOngoing(true) // Giữ thông báo không bị vuốt xóa mất
-            .build()
+        // Phải gọi startForeground sớm khi service được khởi chạy.
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification(
+                "BT Battery",
+                "Đang chờ dữ liệu pin Bluetooth"
+            )
+        )
+    }
 
-        // Đưa service chạy ở chế độ Foreground để ghim thông báo lên thanh trạng thái
-        startForeground(1, notification)
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int
+    ): Int {
+        val deviceName = intent?.getStringExtra("device_name")
+        val batteryLevel = intent?.getIntExtra("battery_level", -1) ?: -1
+
+        if (!deviceName.isNullOrBlank() && batteryLevel in 0..100) {
+            val notification = buildNotification(
+                deviceName,
+                "Mức pin Bluetooth: $batteryLevel%"
+            )
+
+            val manager =
+                getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+
+            manager.notify(NOTIFICATION_ID, notification)
+        }
+
+        return START_NOT_STICKY
+    }
+
+    private fun buildNotification(
+        title: String,
+        message: String
+    ): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val serviceChannel = NotificationChannel(
+            val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Bluetooth Battery Channel",
+                "Bluetooth Battery",
                 NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(serviceChannel)
+            ).apply {
+                description = "Hiển thị thông tin pin Bluetooth"
+            }
+
+            val manager =
+                getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-    }
+    override fun onBind(intent: Intent?): IBinder? = null
 }
