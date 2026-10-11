@@ -1,0 +1,4 @@
+.setCustomContentView(compactContent)
+.setCustomBigContentView(content)
+.setCustomHeadsUpContentView(content)
+.setStyle(NotificationCompat.DecoratedCustomViewStyle())
