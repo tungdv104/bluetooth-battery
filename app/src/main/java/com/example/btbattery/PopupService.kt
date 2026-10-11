@@ -1,8 +1,5 @@
 package com.example.btbattery
 
-import android.graphics.Color
-import android.util.TypedValue
-import android.content.res.Configuration
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -18,109 +15,84 @@ import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 
 class PopupService : Service() {
-@@ -26,21 +26,7 @@ class PopupService : Service() {
-const val EXTRA_RIGHT_BATTERY = "right_battery"
-const val EXTRA_CASE_BATTERY = "case_battery"
-}
-    private fun resolveThemeColor(
-    attr: Int,
-    fallback: Int
-    ): Int {
-    val value = TypedValue()
-    return if (
-        theme.resolveAttribute(attr, value, true) &&
-        value.type in TypedValue.TYPE_FIRST_COLOR_INT..
-            TypedValue.TYPE_LAST_COLOR_INT
-    ) {
-        value.data
-    } else {
-        fallback
-    }
+
+    companion object {
+        private const val CHANNEL_ID = "bt_battery_channel"
+        private const val NOTIFICATION_ID = 2401
+
+        const val EXTRA_DEVICE_NAME = "device_name"
+        const val EXTRA_BATTERY_LEVEL = "battery_level"
+        const val EXTRA_LEFT_BATTERY = "left_battery"
+        const val EXTRA_RIGHT_BATTERY = "right_battery"
+        const val EXTRA_CASE_BATTERY = "case_battery"
     }
 
-private var deviceName = "SoundPEATS PearlClip Pro"
-private var batteryLevel = -1
-private var leftBattery = -1
-@@ -58,41 +44,38 @@ class PopupService : Service() {
-startId: Int
-): Int {
-if (intent != null) {
-            deviceName = intent.getStringExtra(
-                EXTRA_DEVICE_NAME
-            ) ?: deviceName
+    private var deviceName = "SoundPEATS PearlClip Pro"
+    private var batteryLevel = -1
+    private var leftBattery = -1
+    private var rightBattery = -1
+    private var caseBattery = -1
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+    }
+
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int
+    ): Int {
+        if (intent != null) {
             deviceName = intent.getStringExtra(EXTRA_DEVICE_NAME)
                 ?.takeIf { it.isNotBlank() }
                 ?: deviceName
 
-            batteryLevel = intent.getIntExtra(
-                EXTRA_BATTERY_LEVEL, -1
-            ).takeIf { it in 0..100 } ?: -1
             intent.getIntExtra(EXTRA_BATTERY_LEVEL, -1)
                 .takeIf { it in 0..100 }
                 ?.let { batteryLevel = it }
 
-            leftBattery = intent.getIntExtra(
-                EXTRA_LEFT_BATTERY, -1
-            ).takeIf { it in 0..100 } ?: -1
             intent.getIntExtra(EXTRA_LEFT_BATTERY, -1)
                 .takeIf { it in 0..100 }
                 ?.let { leftBattery = it }
 
-            rightBattery = intent.getIntExtra(
-                EXTRA_RIGHT_BATTERY, -1
-            ).takeIf { it in 0..100 } ?: -1
             intent.getIntExtra(EXTRA_RIGHT_BATTERY, -1)
                 .takeIf { it in 0..100 }
                 ?.let { rightBattery = it }
 
-            caseBattery = intent.getIntExtra(
-                EXTRA_CASE_BATTERY, -1
-            ).takeIf { it in 0..100 } ?: -1
             intent.getIntExtra(EXTRA_CASE_BATTERY, -1)
                 .takeIf { it in 0..100 }
                 ?.let { caseBattery = it }
-}
+        }
 
-val notification = buildNotification()
+        val notification = buildNotification()
 
-try {
-            if (Build.VERSION.SDK_INT >= 29) {
+        try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-startForeground(
-NOTIFICATION_ID,
-notification,
-ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-)
-} else {
                 startForeground(
                     NOTIFICATION_ID,
-                    notification
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
                 )
+            } else {
                 startForeground(NOTIFICATION_ID, notification)
-}
-} catch (e: Exception) {
-android.util.Log.e(
-@@ -108,30 +91,39 @@ class PopupService : Service() {
-}
-
-private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Pin tai nghe",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Hiển thị pin trái, phải và hộp sạc"
-                setShowBadge(false)
-                enableVibration(false)
-                setSound(null, null)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
+        } catch (e: Exception) {
+            android.util.Log.e(
+                "PopupService",
+                "Không thể hiển thị thông báo",
+                e
+            )
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        return START_STICKY
+    }
+
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
-            getSystemService(
-                NotificationManager::class.java
-            ).createNotificationChannel(channel)
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Pin tai nghe",
@@ -131,19 +103,16 @@ private fun createNotificationChannel() {
             enableVibration(false)
             setSound(null, null)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-}
-    }
+        }
 
-    private fun batteryText(value: Int): String {
-        return if (value in 0..100) "$value%" else "—"
         getSystemService(NotificationManager::class.java)
             .createNotificationChannel(channel)
-}
+    }
 
     private fun batteryText(value: Int): String =
         if (value in 0..100) "$value%" else "—"
 
-private fun buildNotification(): Notification {
+    private fun buildNotification(): Notification {
         val nightMode =
             (resources.configuration.uiMode and
                 Configuration.UI_MODE_NIGHT_MASK) ==
@@ -155,24 +124,22 @@ private fun buildNotification(): Notification {
         val secondaryTextColor =
             if (nightMode) Color.LTGRAY else Color.DKGRAY
 
-val openIntent = Intent(
-this,
-MainActivity::class.java
-@@ -148,96 +140,99 @@ class PopupService : Service() {
-PendingIntent.FLAG_IMMUTABLE
-)
+        val openIntent = Intent(
+            this,
+            MainActivity::class.java
+        ).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
 
-       
-val nightMode =
-    (resources.configuration.uiMode and
-        Configuration.UI_MODE_NIGHT_MASK) ==
-        Configuration.UI_MODE_NIGHT_YES
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            2402,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                PendingIntent.FLAG_IMMUTABLE
+        )
 
-val primaryTextColor = if (nightMode) {
-    Color.WHITE
-} else {
-    Color.BLACK
-}
         // Popup thu gọn: hiển thị cả 3 mức pin trên cùng một hàng.
         val compactContent = RemoteViews(
             packageName,
@@ -191,58 +158,11 @@ val primaryTextColor = if (nightMode) {
                 "R  ${batteryText(rightBattery)}"
             )
 
-val secondaryTextColor = if (nightMode) {
-    Color.LTGRAY
-} else {
-    Color.DKGRAY
-}
             setTextColor(R.id.notification_left, primaryTextColor)
             setTextColor(R.id.notification_case, primaryTextColor)
             setTextColor(R.id.notification_right, primaryTextColor)
         }
 
-val content = android.widget.RemoteViews(
-    packageName,
-    R.layout.notification_battery
-).apply {
-    setTextViewText(
-        R.id.notification_device_name,
-        deviceName
-    )
-
-    setTextViewText(
-        R.id.notification_left,
-        batteryText(leftBattery)
-    )
-
-    setTextViewText(
-        R.id.notification_case,
-        batteryText(caseBattery)
-    )
-
-    setTextViewText(
-        R.id.notification_right,
-        batteryText(rightBattery)
-    )
-
-    // Chữ chính: trắng ở theme tối, đen ở theme sáng.
-    setTextColor(
-        R.id.notification_device_name,
-        primaryTextColor
-    )
-    setTextColor(
-        R.id.notification_left,
-        primaryTextColor
-    )
-    setTextColor(
-        R.id.notification_case,
-        primaryTextColor
-    )
-    setTextColor(
-        R.id.notification_right,
-        primaryTextColor
-    )
-}
         // Popup mở rộng: giữ bố cục 3 ô, không cần nền riêng từng ô.
         val expandedContent = RemoteViews(
             packageName,
@@ -291,43 +211,35 @@ val content = android.widget.RemoteViews(
             )
         }
 
-val summary = if (
-leftBattery in 0..100 ||
-rightBattery in 0..100 ||
-caseBattery in 0..100
-) {
-            "L ${batteryText(leftBattery)}  ·  " +
-                "Case ${batteryText(caseBattery)}  ·  " +
+        val summary = if (
+            leftBattery in 0..100 ||
+            rightBattery in 0..100 ||
+            caseBattery in 0..100
+        ) {
             "L ${batteryText(leftBattery)} · " +
                 "Hộp ${batteryText(caseBattery)} · " +
-"R ${batteryText(rightBattery)}"
-} else if (batteryLevel in 0..100) {
-            "Đang chờ pin riêng từng bên"
+                "R ${batteryText(rightBattery)}"
+        } else if (batteryLevel in 0..100) {
             "Pin Bluetooth: ${batteryText(batteryLevel)}"
-} else {
-"Đang theo dõi kết nối Bluetooth"
-}
+        } else {
+            "Đang theo dõi kết nối Bluetooth"
+        }
 
-        return NotificationCompat.Builder(
-            this,
-            CHANNEL_ID
-        )
-            .setSmallIcon(
-                android.R.drawable.stat_sys_data_bluetooth
-            )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-.setContentTitle(deviceName)
-.setContentText(summary)
-            .setCustomContentView(content)
-            .setCustomBigContentView(content)
-            .setStyle(
-                NotificationCompat.DecoratedCustomViewStyle()
-            )
+            .setContentTitle(deviceName)
+            .setContentText(summary)
             .setCustomContentView(compactContent)
             .setCustomBigContentView(expandedContent)
             .setCustomHeadsUpContentView(compactContent)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-.setContentIntent(pendingIntent)
-.setPriority(NotificationCompat.PRIORITY_LOW)
-.setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+}
