@@ -4,8 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="12dp"
-    android:background="#171E2B">
+    android:padding="12dp">
 
     <TextView
         android:id="@+id/notification_device_name"
@@ -33,7 +32,6 @@
             android:layout_marginEnd="4dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="#26364A"
             android:padding="4dp">
 
             <TextView
