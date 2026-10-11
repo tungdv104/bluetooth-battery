@@ -2,8 +2,10 @@
 package com.example.btbattery
 
 import android.Manifest
+import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -15,136 +17,209 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.Gravity
-import android.widget.Button
+import android.view.View
+import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
-    private val adapter: BluetoothAdapter? =
-        BluetoothAdapter.getDefaultAdapter()
+    private lateinit var root: LinearLayout
+    private lateinit var deviceContainer: LinearLayout
+    private lateinit var statusText: TextView
+    private lateinit var totalText: TextView
 
-    private lateinit var list: LinearLayout
-    private lateinit var statusView: TextView
+    private val batteryLevels = mutableMapOf<String, Int>()
+    private val connectedDevices = linkedMapOf<String, BluetoothDevice>()
 
-    private val connected = linkedMapOf<String, BluetoothDevice>()
-    private val levels = mutableMapOf<String, Int>()
+    private var bluetoothAdapter: BluetoothAdapter? = null
     private var receiverRegistered = false
 
-    private val batteryAction =
-        "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
+    private val permissionRequestCode = 501
 
-    private val btReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val device = getDevice(intent) ?: return
+    private val green = Color.rgb(91, 230, 145)
+    private val backgroundColor = Color.rgb(10, 13, 15)
+    private val cardColor = Color.argb(220, 27, 33, 36)
+    private val secondaryText = Color.rgb(164, 176, 179)
+
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent == null) return
 
             when (intent.action) {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                    connected[device.address] = device
+                    val device = getDeviceFromIntent(intent) ?: return
+                    connectedDevices[device.address] = device
                     refreshUI()
+                    refreshConnectedDevices()
                 }
 
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                    connected.remove(device.address)
+                    val device = getDeviceFromIntent(intent) ?: return
+                    connectedDevices.remove(device.address)
                     refreshUI()
                 }
 
-                batteryAction -> {
+                BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
+                    refreshConnectedDevices()
+                }
+
+                "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED" -> {
+                    val device = getDeviceFromIntent(intent) ?: return
                     val level = intent.getIntExtra(
-                        "android.bluetooth.device.extra.BATTERY_LEVEL", -1
+                        BluetoothDevice.EXTRA_BATTERY_LEVEL,
+                        -1
                     )
+
                     if (level in 0..100) {
-                        levels[device.address] = level
-                        refreshUI()
+                        batteryLevels[device.address] = level
+                        connectedDevices[device.address] = device
+                        updateNotification(device, level)
                     }
+
+                    refreshUI()
+                }
+
+                BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                    refreshConnectedDevices()
                 }
             }
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun getDevice(intent: Intent): BluetoothDevice? {
-        return if (Build.VERSION.SDK_INT >= 33) {
-            intent.getParcelableExtra(
-                BluetoothDevice.EXTRA_DEVICE,
-                BluetoothDevice::class.java
-            )
-        } else {
-            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.statusBarColor = Color.rgb(8, 10, 12)
-        window.navigationBarColor = Color.rgb(8, 10, 12)
+        val manager = getSystemService(Context.BLUETOOTH_SERVICE)
+            as BluetoothManager
+        bluetoothAdapter = manager.adapter
 
         buildUI()
-        requestNeededPermissions()
+        requestBluetoothPermissions()
     }
 
     override fun onResume() {
         super.onResume()
         registerBluetoothReceiver()
-        if (hasBluetoothPermission()) {
-            startMonitorService()
-            refreshConnectedDevices()
-            refreshUI()
-        }
+        refreshConnectedDevices()
     }
 
     override fun onPause() {
+        super.onPause()
+
         if (receiverRegistered) {
             try {
-                unregisterReceiver(btReceiver)
+                unregisterReceiver(bluetoothReceiver)
             } catch (_: Exception) {
             }
             receiverRegistered = false
         }
-        super.onPause()
     }
 
-    private fun requestNeededPermissions() {
-        val needed = mutableListOf<String>()
-
-        if (Build.VERSION.SDK_INT >= 31 &&
-            ContextCompat.checkSelfPermission(
-                this, Manifest.permission.BLUETOOTH_CONNECT
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            needed.add(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun buildUI() {
+        root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(12))
+            setBackgroundColor(backgroundColor)
         }
 
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(
-                this, Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            needed.add(Manifest.permission.POST_NOTIFICATIONS)
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(8), dp(4), dp(18))
         }
 
-        if (needed.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, needed.toTypedArray(), 100)
-        } else {
-            startMonitorService()
-            refreshConnectedDevices()
-            refreshUI()
-        }
-    }
+        header.addView(TextView(this).apply {
+            text = "BT BATTERY"
+            textSize = 25f
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            letterSpacing = 0.06f
+        })
 
-    private fun hasBluetoothPermission(): Boolean {
-        return Build.VERSION.SDK_INT < 31 ||
-            ContextCompat.checkSelfPermission(
-                this, Manifest.permission.BLUETOOTH_CONNECT
-            ) == PackageManager.PERMISSION_GRANTED
+        header.addView(TextView(this).apply {
+            text = "THE SMART BATTERY MONITOR"
+            textSize = 10f
+            setTextColor(green)
+            letterSpacing = 0.12f
+            setPadding(0, dp(5), 0, 0)
+        })
+
+        root.addView(header)
+
+        val statusCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            background = rounded(cardColor, 18)
+        }
+
+        statusText = TextView(this).apply {
+            text = "Đang kiểm tra Bluetooth..."
+            textSize = 14f
+            setTextColor(green)
+            setTypeface(null, Typeface.BOLD)
+        }
+
+        totalText = TextView(this).apply {
+            text = "Chưa có dữ liệu pin"
+            textSize = 12f
+            setTextColor(secondaryText)
+            setPadding(0, dp(6), 0, 0)
+        }
+
+        statusCard.addView(statusText)
+        statusCard.addView(totalText)
+
+        root.addView(
+            statusCard,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(18)
+            }
+        )
+
+        root.addView(TextView(this).apply {
+            text = "THIẾT BỊ CỦA BẠN"
+            textSize = 11f
+            setTextColor(secondaryText)
+            setTypeface(null, Typeface.BOLD)
+            letterSpacing = 0.08f
+            setPadding(dp(3), 0, 0, dp(12))
+        })
+
+        deviceContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        val scrollView = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            addView(
+                deviceContainer,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        root.addView(
+            scrollView,
+            LinearLayout.LayoutParams(0, 0, 1f)
+        )
+
+        root.addView(TextView(this).apply {
+            text = "Pin riêng phụ thuộc dữ liệu Bluetooth của tai nghe."
+            textSize = 10f
+            setTextColor(Color.rgb(115, 126, 131))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(12), 0, dp(4))
+        })
+
+        setContentView(root)
     }
 
     private fun registerBluetoothReceiver() {
@@ -153,315 +228,395 @@ class MainActivity : AppCompatActivity() {
         val filter = IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
-            addAction(batteryAction)
+            addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            addAction("android.bluetooth.device.action.BATTERY_LEVEL_CHANGED")
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
         }
 
         try {
-            ContextCompat.registerReceiver(
-                this, btReceiver, filter, ContextCompat.RECEIVER_EXPORTED
-            )
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(
+                    bluetoothReceiver,
+                    filter,
+                    Context.RECEIVER_EXPORTED
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(bluetoothReceiver, filter)
+            }
             receiverRegistered = true
         } catch (_: Exception) {
         }
     }
 
-    private fun startMonitorService() {
-        if (!hasBluetoothPermission()) return
-        try {
-            val intent = Intent(this, PopupService::class.java)
-            if (Build.VERSION.SDK_INT >= 26) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun refreshConnectedDevices() {
-        val bt = adapter ?: return
-        if (!hasBluetoothPermission() || !bt.isEnabled) return
-
-        requestProfile(BluetoothProfile.A2DP)
-        requestProfile(BluetoothProfile.HEADSET)
-
-        try {
-            for (device in bt.bondedDevices) {
-                readBattery(device)?.let { levels[device.address] = it }
-            }
-        } catch (_: Exception) {
-        }
-    }
-
-    private fun requestProfile(profile: Int) {
-        val bt = adapter ?: return
-        try {
-            bt.getProfileProxy(
-                this,
-                object : BluetoothProfile.ServiceListener {
-                    override fun onServiceConnected(
-                        profileType: Int,
-                        proxy: BluetoothProfile
-                    ) {
-                        try {
-                            for (device in proxy.connectedDevices) {
-                                connected[device.address] = device
-                                readBattery(device)?.let {
-                                    levels[device.address] = it
-                                }
-                            }
-                            runOnUiThread { refreshUI() }
-                        } catch (_: Exception) {
-                        } finally {
-                            try {
-                                bt.closeProfileProxy(profileType, proxy)
-                            } catch (_: Exception) {
-                            }
-                        }
-                    }
-
-                    override fun onServiceDisconnected(profileType: Int) = Unit
-                },
-                profile
+    private fun requestBluetoothPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val permissions = arrayOf(
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN
             )
-        } catch (_: Exception) {
-        }
-    }
 
-    private fun readBattery(device: BluetoothDevice): Int? {
-        if (!hasBluetoothPermission()) return null
-        return try {
-            val method = BluetoothDevice::class.java.getMethod("getBatteryLevel")
-            (method.invoke(device) as? Int)?.takeIf { it in 0..100 }
-        } catch (_: Exception) {
-            null
-        } catch (_: LinkageError) {
-            null
-        }
-    }
-
-    private fun buildUI() {
-        val green = Color.rgb(91, 230, 145)
-        val secondary = Color.rgb(155, 165, 175)
-
-        val scroll = ScrollView(this).apply {
-            setBackgroundColor(Color.rgb(8, 10, 12))
-            isFillViewport = true
-        }
-
-        list = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(26), dp(20), dp(30))
-        }
-        scroll.addView(list)
-        setContentView(scroll)
-
-        list.addView(TextView(this).apply {
-            text = "BT BATTERY"
-            textSize = 12f
-            letterSpacing = 0.2f
-            setTextColor(green)
-            setTypeface(null, Typeface.BOLD)
-        })
-
-        list.addView(TextView(this).apply {
-            text = "Pin thiết bị"
-            textSize = 30f
-            setTextColor(Color.WHITE)
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, dp(8), 0, dp(4))
-        })
-
-        list.addView(TextView(this).apply {
-            text = "Theo dõi kết nối và pin Bluetooth"
-            textSize = 14f
-            setTextColor(secondary)
-        })
-
-        statusView = TextView(this).apply {
-            textSize = 13f
-            setTextColor(secondary)
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = rounded(Color.rgb(25, 29, 32), 14)
-        }
-        list.addView(statusView, params(top = 22, bottom = 12))
-
-        list.addView(makeButton("Cấp quyền thông báo") {
-            if (Build.VERSION.SDK_INT >= 33 &&
+            val missing = permissions.filter {
                 ContextCompat.checkSelfPermission(
-                    this, Manifest.permission.POST_NOTIFICATIONS
+                    this,
+                    it
                 ) != PackageManager.PERMISSION_GRANTED
-            ) {
+            }
+
+            if (missing.isNotEmpty()) {
                 ActivityCompat.requestPermissions(
                     this,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    101
+                    missing.toTypedArray(),
+                    permissionRequestCode
                 )
-            } else {
-                startActivity(
-                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-                )
+                return
             }
-        })
+        }
 
-        list.addView(makeButton("Làm mới thiết bị") {
-            refreshConnectedDevices()
-            refreshUI()
-        }, params(top = 10, bottom = 20))
-
-        refreshUI()
+        refreshConnectedDevices()
     }
-
-    private fun refreshUI() {
-        if (!::list.isInitialized) return
-
-        runOnUiThread {
-            while (list.childCount > 6) {
-                list.removeViewAt(6)
-            }
-
-            statusView.text = when {
-                adapter == null -> "Điện thoại không hỗ trợ Bluetooth."
-                !hasBluetoothPermission() -> "Hãy cấp quyền Bluetooth."
-                adapter?.isEnabled != true -> "Bluetooth đang tắt."
-                connected.isNotEmpty() ->
-                    "Đang kết nối ${connected.size} thiết bị."
-                else -> "Chưa phát hiện tai nghe đang kết nối."
-            }
-
-            list.addView(TextView(this).apply {
-                text = "THIẾT BỊ ĐÃ GHÉP ĐÔI"
-                textSize = 12f
-                letterSpacing = 0.08f
-                setTextColor(Color.rgb(155, 165, 175))
-                setTypeface(null, Typeface.BOLD)
-                setPadding(0, dp(8), 0, dp(12))
-            })
-
-            if (adapter == null || !hasBluetoothPermission()) {
-                addMessage("Không thể đọc danh sách thiết bị. Kiểm tra quyền Bluetooth.")
-                return@runOnUiThread
-            }
-
-            val devices = try {
-                (adapter!!.bondedDevices + connected.values)
-                    .associateBy { it.address }
-                    .values.toList()
-            } catch (_: Exception) {
-                connected.values.toList()
-            }
-
-            if (devices.isEmpty()) {
-                addMessage("Chưa có thiết bị ghép đôi. Hãy kết nối tai nghe rồi nhấn Làm mới.")
-                return@runOnUiThread
-            }
-
-            devices.forEach { device ->
-                val level = levels[device.address] ?: readBattery(device)
-                val isConnected = connected.containsKey(device.address)
-
-                val card = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(dp(16), dp(16), dp(16), dp(16))
-                    background = rounded(Color.rgb(22, 26, 29), 18)
-                }
-
-                card.addView(TextView(this).apply {
-                    text = safeName(device)
-                    textSize = 17f
-                    setTextColor(Color.WHITE)
-                    setTypeface(null, Typeface.BOLD)
-                })
-
-                card.addView(TextView(this).apply {
-                    text = if (isConnected) "● Đã kết nối" else "○ Đã ghép đôi"
-                    textSize = 13f
-                    setTextColor(
-                        if (isConnected) Color.rgb(91, 230, 145)
-                        else Color.rgb(155, 165, 175)
-                    )
-                    setPadding(0, dp(6), 0, dp(8))
-                })
-
-                card.addView(TextView(this).apply {
-                    text = level?.let { "Pin Bluetooth: $it%" }
-                        ?: "Android chưa cung cấp dữ liệu pin."
-                    textSize = 14f
-                    setTextColor(Color.rgb(210, 215, 220))
-                })
-
-                list.addView(card, params(bottom = 12))
-            }
-        }
-    }
-
-    private fun safeName(device: BluetoothDevice): String {
-        return try {
-            device.name ?: "Thiết bị Bluetooth"
-        } catch (_: Exception) {
-            "Thiết bị Bluetooth"
-        }
-    }
-
-    private fun addMessage(message: String) {
-        list.addView(TextView(this).apply {
-            text = message
-            textSize = 14f
-            setTextColor(Color.rgb(210, 215, 220))
-            setPadding(dp(16), dp(18), dp(16), dp(18))
-            background = rounded(Color.rgb(22, 26, 29), 16)
-        })
-    }
-
-    private fun makeButton(label: String, action: () -> Unit) =
-        Button(this).apply {
-            text = label
-            isAllCaps = false
-            textSize = 14f
-            setTextColor(Color.rgb(8, 10, 12))
-            background = rounded(Color.rgb(91, 230, 145), 14)
-            setOnClickListener { action() }
-            layoutParams = params()
-        }
-
-    private fun params(top: Int = 0, bottom: Int = 0) =
-        LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(top)
-            bottomMargin = dp(bottom)
-        }
-
-    private fun rounded(color: Int, radius: Int) =
-        GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radius).toFloat()
-        }
-
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        super.onRequestPermissionsResult(
+            requestCode,
+            permissions,
+            grantResults
+        )
 
-        if (requestCode == 100) {
-            if (hasBluetoothPermission()) {
-                startMonitorService()
+        if (requestCode == permissionRequestCode) {
+            if (grantResults.isNotEmpty() &&
+                grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+            ) {
                 refreshConnectedDevices()
-                refreshUI()
             } else {
-                Toast.makeText(
-                    this, "Cần cấp quyền Bluetooth để hoạt động.",
-                    Toast.LENGTH_LONG
-                ).show()
+                statusText.text = "Cần quyền Bluetooth để tìm thiết bị"
+            }
+        }
+    }
+
+    private fun refreshConnectedDevices() {
+        val adapter = bluetoothAdapter
+
+        if (adapter == null) {
+            statusText.text = "Thiết bị không hỗ trợ Bluetooth"
+            refreshUI()
+            return
+        }
+
+        try {
+            if (!adapter.isEnabled) {
+                statusText.text = "Bluetooth đang tắt"
+                connectedDevices.clear()
+                refreshUI()
+                return
+            }
+
+            // Giữ lại thiết bị đã nhận được sự kiện kết nối.
+            // Đọc mức pin hệ thống nếu Android cho phép.
+            val bondedDevices = adapter.bondedDevices ?: emptySet()
+
+            for (device in bondedDevices) {
+                val level = getBatteryLevel(device)
+                if (level in 0..100) {
+                    batteryLevels[device.address] = level
+                }
+            }
+
+            // Truy vấn thiết bị đang dùng profile A2DP.
+            adapter.getProfileProxy(
+                this,
+                object : BluetoothProfile.ServiceListener {
+                    override fun onServiceConnected(
+                        profile: Int,
+                        proxy: BluetoothProfile
+                    ) {
+                        try {
+                            if (profile == BluetoothProfile.A2DP ||
+                                profile == BluetoothProfile.HEADSET
+                            ) {
+                                for (device in proxy.connectedDevices) {
+                                    connectedDevices[device.address] = device
+
+                                    val level = getBatteryLevel(device)
+                                    if (level in 0..100) {
+                                        batteryLevels[device.address] = level
+                                    }
+                                }
+
+                                refreshUI()
+                            }
+                        } catch (_: SecurityException) {
+                        } finally {
+                            try {
+                                adapter.closeProfileProxy(profile, proxy)
+                            } catch (_: Exception) {
+                            }
+                        }
+                    }
+
+                    override fun onServiceDisconnected(profile: Int) {
+                    }
+                },
+                BluetoothProfile.A2DP
+            )
+
+            statusText.text = "Đang theo dõi Bluetooth"
+            refreshUI()
+        } catch (_: SecurityException) {
+            statusText.text = "Chưa được cấp quyền Bluetooth"
+        } catch (_: Exception) {
+            statusText.text = "Không đọc được trạng thái Bluetooth"
+            refreshUI()
+        }
+    }
+
+    private fun getBatteryLevel(device: BluetoothDevice): Int {
+        return try {
+            val method = device.javaClass.getMethod("getBatteryLevel")
+            val result = method.invoke(device) as? Int ?: -1
+            if (result in 0..100) result else -1
+        } catch (_: Exception) {
+            -1
+        }
+    }
+
+    private fun getDeviceFromIntent(intent: Intent): BluetoothDevice? {
+        return try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                intent.getParcelableExtra(
+                    BluetoothDevice.EXTRA_DEVICE,
+                    BluetoothDevice::class.java
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun updateNotification(
+        device: BluetoothDevice,
+        level: Int
+    ) {
+        try {
+            val intent = Intent(this, PopupService::class.java).apply {
+                putExtra(PopupService.EXTRA_DEVICE_NAME, getDeviceName(device))
+                putExtra(PopupService.EXTRA_BATTERY_LEVEL, level)
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } catch (_: Exception) {
+            // Không làm crash giao diện nếu Android chặn khởi chạy service.
+        }
+    }
+
+    private fun refreshUI() {
+        deviceContainer.removeAllViews()
+
+        val devices = connectedDevices.values.toList()
+
+        if (devices.isEmpty()) {
+            statusText.text = if (bluetoothAdapter?.isEnabled == true) {
+                "Chưa phát hiện tai nghe đang kết nối"
+            } else {
+                "Bluetooth đang tắt"
+            }
+
+            totalText.text = "Kết nối tai nghe để xem pin"
+            deviceContainer.addView(TextView(this).apply {
+                text = "Chưa có thiết bị kết nối.\n\nHãy bật Bluetooth và kết nối tai nghe."
+                textSize = 14f
+                setTextColor(secondaryText)
+                gravity = Gravity.CENTER
+                setPadding(dp(20), dp(42), dp(20), dp(42))
+                background = rounded(cardColor, 18)
+            })
+            return
+        }
+
+        statusText.text = "${devices.size} thiết bị Bluetooth"
+
+        var knownLevels = 0
+
+        for (device in devices) {
+            val level = batteryLevels[device.address]
+                ?: getBatteryLevel(device).takeIf { it in 0..100 }
+
+            if (level != null && level in 0..100) {
+                batteryLevels[device.address] = level
+                knownLevels++
+            }
+
+            addDeviceCard(
+                name = getDeviceName(device),
+                address = device.address,
+                level = level,
+                connected = true
+            )
+
+            if (level != null && level in 0..100) {
+                updateNotification(device, level)
             }
         }
 
-        if (requestCode == 101 || requestCode == 100) {
-            refreshUI()
+        totalText.text = if (knownLevels > 0) {
+            "Đã đọc được pin tổng của $knownLevels thiết bị"
+        } else {
+            "Đang chờ dữ liệu pin từ tai nghe"
         }
+    }
+
+    private fun addDeviceCard(
+        name: String,
+        address: String,
+        level: Int?,
+        connected: Boolean
+    ) {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), dp(17), dp(15), dp(15))
+            background = rounded(cardColor, 22)
+        }
+
+        card.addView(TextView(this).apply {
+            text = name
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            maxLines = 2
+        })
+
+        card.addView(TextView(this).apply {
+            text = if (connected) "● ĐÃ KẾT NỐI" else "○ ĐÃ NGẮT KẾT NỐI"
+            textSize = 10f
+            setTextColor(if (connected) green else secondaryText)
+            letterSpacing = 0.06f
+            setPadding(0, dp(6), 0, dp(17))
+        })
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        row.addView(
+            makeBatteryTile("TRÁI", "L", null),
+            LinearLayout.LayoutParams(0, dp(124), 1f).apply {
+                marginEnd = dp(5)
+            }
+        )
+
+        row.addView(
+            makeBatteryTile("CASE", "▱", null),
+            LinearLayout.LayoutParams(0, dp(124), 1f).apply {
+                marginHorizontal = dp(3)
+            }
+        )
+
+        row.addView(
+            makeBatteryTile("PHẢI", "R", null),
+            LinearLayout.LayoutParams(0, dp(124), 1f).apply {
+                marginStart = dp(5)
+            }
+        )
+
+        card.addView(row)
+
+        card.addView(TextView(this).apply {
+            text = if (level != null && level in 0..100) {
+                "Pin Bluetooth tổng  ·  $level%"
+            } else {
+                "Pin Bluetooth tổng  ·  Chưa có dữ liệu"
+            }
+            textSize = 13f
+            setTextColor(green)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(17), 0, dp(10))
+        })
+
+        card.addView(TextView(this).apply {
+            text = address
+            textSize = 10f
+            setTextColor(Color.rgb(115, 126, 131))
+            gravity = Gravity.CENTER
+        })
+
+        deviceContainer.addView(
+            card,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(13)
+            }
+        )
+    }
+
+    private fun makeBatteryTile(
+        label: String,
+        symbol: String,
+        battery: Int?
+    ): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(3), dp(9), dp(3), dp(9))
+            background = rounded(Color.rgb(35, 43, 44), 16)
+
+            addView(TextView(this@MainActivity).apply {
+                text = symbol
+                textSize = 23f
+                setTextColor(green)
+                setTypeface(null, Typeface.BOLD)
+                gravity = Gravity.CENTER
+            })
+
+            addView(TextView(this@MainActivity).apply {
+                text = label
+                textSize = 10f
+                setTextColor(secondaryText)
+                gravity = Gravity.CENTER
+                setPadding(0, dp(6), 0, dp(5))
+            })
+
+            addView(TextView(this@MainActivity).apply {
+                text = battery?.let { "$it%" } ?: "—"
+                textSize = 18f
+                setTextColor(Color.WHITE)
+                setTypeface(null, Typeface.BOLD)
+                gravity = Gravity.CENTER
+            })
+        }
+    }
+
+    private fun getDeviceName(device: BluetoothDevice): String {
+        return try {
+            device.name?.takeIf { it.isNotBlank() }
+                ?: "Tai nghe Bluetooth"
+        } catch (_: SecurityException) {
+            "Tai nghe Bluetooth"
+        }
+    }
+
+    private fun rounded(
+        color: Int,
+        radiusDp: Int
+    ): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radiusDp).toFloat()
+            setStroke(dp(1), Color.argb(45, 255, 255, 255))
+        }
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
     }
 }
