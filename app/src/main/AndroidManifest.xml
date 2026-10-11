@@ -1,26 +1,24 @@
+
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Thêm quyền hiển thị trên ứng dụng khác -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <!-- Cấp quyền kết nối và đọc thông tin Bluetooth -->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
-        <service
-    android:name=".PopupService"
-    android:exported="false"
-    android:foregroundServiceType="connectedDevice" />
         android:allowBackup="true"
-    android:icon="@drawable/app_logo"
-    android:roundIcon="@drawable/app_logo"
-    android:label="BT Battery"
-    android:supportsRtl="true"
-    android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
-        
+        android:icon="@drawable/app_logo"
+        android:roundIcon="@drawable/app_logo"
+        android:label="BT Battery"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -30,11 +28,10 @@
             </intent-filter>
         </activity>
 
-        <!-- BỔ SUNG KHAI BÁO SERVICE NÀY VÀO -->
-        <service 
+        <service
             android:name=".PopupService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
     </application>
-
 </manifest>
