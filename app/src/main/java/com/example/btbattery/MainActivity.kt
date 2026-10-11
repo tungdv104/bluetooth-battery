@@ -498,37 +498,51 @@ private fun readPeatsBatteryIfSupported(device: BluetoothDevice) {
     }
 
     private fun sendNotification(
-        device: BluetoothDevice,
-        level: Int
-    ) {
-        val serviceIntent = Intent(
-            this,
-            PopupService::class.java
-        ).apply {
-            putExtra(
-                PopupService.EXTRA_DEVICE_NAME,
-                getDeviceName(device)
-            )
+    device: BluetoothDevice,
+    level: Int
+) {
+    val peats = peatsBatteryStates[device.address]
 
-            putExtra(
-                PopupService.EXTRA_BATTERY_LEVEL,
-                if (level in 0..100) {
-    level
-} else {
-    batteryLevels[device.address] ?: -1
-}
-            )
-        }
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
-            }
-        } catch (_: Exception) {
-        }
+    val serviceIntent = Intent(
+        this,
+        PopupService::class.java
+    ).apply {
+        putExtra(
+            PopupService.EXTRA_DEVICE_NAME,
+            getDeviceName(device)
+        )
+        putExtra(
+            PopupService.EXTRA_BATTERY_LEVEL,
+            if (level in 0..100) level else -1
+        )
+        putExtra(
+            PopupService.EXTRA_LEFT_BATTERY,
+            peats?.left ?: -1
+        )
+        putExtra(
+            PopupService.EXTRA_RIGHT_BATTERY,
+            peats?.right ?: -1
+        )
+        putExtra(
+            PopupService.EXTRA_CASE_BATTERY,
+            peats?.case ?: -1
+        )
     }
+
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+    } catch (e: Exception) {
+        android.util.Log.e(
+            "BTBattery",
+            "Không cập nhật được popup",
+            e
+        )
+    }
+}
 
     private fun refreshUI() {
         if (!::deviceContainer.isInitialized) return
@@ -655,21 +669,7 @@ if (level != null && level in 0..100) {
 
             item.addView(row)
 
-            item.addView(
-                text(
-                    if (level != null && level in 0..100) {
-                        "PIN TỔNG  ·  $level%"
-                    } else {
-                        "PIN TỔNG  ·  Chưa có dữ liệu"
-                    },
-                    13f,
-                    green,
-                    true
-                ).apply {
-                    gravity = Gravity.CENTER
-                    setPadding(0, dp(17), 0, dp(10))
-                }
-            )
+            
 
             item.addView(
                 text(
