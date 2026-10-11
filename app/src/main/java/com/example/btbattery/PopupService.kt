@@ -1,3 +1,4 @@
+
 package com.example.btbattery
 
 import android.app.Notification
@@ -5,7 +6,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.Color
@@ -33,9 +38,105 @@ class PopupService : Service() {
     private var rightBattery = -1
     private var caseBattery = -1
 
+    private var isDeviceConnected = false
+    private var receiverRegistered = false
+
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent == null) return
+
+            val action = intent.action ?: return
+
+            if (
+                action != BluetoothDevice.ACTION_ACL_CONNECTED &&
+                action != BluetoothDevice.ACTION_ACL_DISCONNECTED
+            ) {
+                return
+            }
+
+            val device: BluetoothDevice? =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(
+                        BluetoothDevice.EXTRA_DEVICE,
+                        BluetoothDevice::class.java
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                }
+
+            val remoteName = try {
+                device?.name.orEmpty()
+            } catch (e: SecurityException) {
+                ""
+            }
+
+            // Chỉ xử lý tai nghe mục tiêu, tránh nhầm với thiết bị Bluetooth khác.
+            val targetName = deviceName.lowercase()
+            val name = remoteName.lowercase()
+
+            val isTargetDevice =
+                name.contains("soundpeats") ||
+                name.contains("pearlclip") ||
+                (
+                    name.isNotBlank() &&
+                    targetName.contains(name)
+                ) ||
+                (
+                    name.isNotBlank() &&
+                    name.contains(targetName)
+                )
+
+            if (!isTargetDevice) return
+
+            when (action) {
+                BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                    isDeviceConnected = true
+                    refreshNotification()
+                }
+
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                    isDeviceConnected = false
+                    refreshNotification()
+                }
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        registerBluetoothReceiver()
+    }
+
+    private fun registerBluetoothReceiver() {
+        if (receiverRegistered) return
+
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(
+                    bluetoothReceiver,
+                    filter,
+                    Context.RECEIVER_EXPORTED
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(bluetoothReceiver, filter)
+            }
+
+            receiverRegistered = true
+        } catch (e: Exception) {
+            android.util.Log.e(
+                "PopupService",
+                "Không đăng ký được Bluetooth receiver",
+                e
+            )
+        }
     }
 
     override fun onStartCommand(
@@ -44,38 +145,47 @@ class PopupService : Service() {
         startId: Int
     ): Int {
         if (intent != null) {
-            deviceName = intent.getStringExtra(EXTRA_DEVICE_NAME)
+            intent.getStringExtra(EXTRA_DEVICE_NAME)
                 ?.takeIf { it.isNotBlank() }
-                ?: deviceName
+                ?.let { deviceName = it }
+
+            var receivedBattery = false
 
             intent.getIntExtra(EXTRA_BATTERY_LEVEL, -1)
                 .takeIf { it in 0..100 }
-                ?.let { batteryLevel = it }
+                ?.let {
+                    batteryLevel = it
+                    receivedBattery = true
+                }
 
             intent.getIntExtra(EXTRA_LEFT_BATTERY, -1)
                 .takeIf { it in 0..100 }
-                ?.let { leftBattery = it }
+                ?.let {
+                    leftBattery = it
+                    receivedBattery = true
+                }
 
             intent.getIntExtra(EXTRA_RIGHT_BATTERY, -1)
                 .takeIf { it in 0..100 }
-                ?.let { rightBattery = it }
+                ?.let {
+                    rightBattery = it
+                    receivedBattery = true
+                }
 
             intent.getIntExtra(EXTRA_CASE_BATTERY, -1)
                 .takeIf { it in 0..100 }
-                ?.let { caseBattery = it }
+                ?.let {
+                    caseBattery = it
+                    receivedBattery = true
+                }
+
+            if (receivedBattery) {
+                isDeviceConnected = true
+            }
         }
-       BatteryWidgetProvider.persistAndUpdate(
-    context = this,
-    deviceName = deviceName,
-    left = leftBattery,
-    right = rightBattery,
-    caseBattery = caseBattery,
-    total = batteryLevel
-)
 
-val notification = buildNotification()
+        val notification = buildNotification()
 
-        
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
@@ -96,7 +206,50 @@ val notification = buildNotification()
             return START_NOT_STICKY
         }
 
+        updateWidget()
+
         return START_STICKY
+    }
+
+    private fun refreshNotification() {
+        try {
+            val manager =
+                getSystemService(Context.NOTIFICATION_SERVICE)
+                    as NotificationManager
+
+            manager.notify(
+                NOTIFICATION_ID,
+                buildNotification()
+            )
+
+            updateWidget()
+        } catch (e: Exception) {
+            android.util.Log.e(
+                "PopupService",
+                "Không cập nhật được trạng thái kết nối",
+                e
+            )
+        }
+    }
+
+    private fun updateWidget() {
+        try {
+            BatteryWidgetProvider.persistAndUpdate(
+                context = this,
+                deviceName = deviceName,
+                left = leftBattery,
+                right = rightBattery,
+                caseBattery = caseBattery,
+                total = batteryLevel,
+                connected = isDeviceConnected
+            )
+        } catch (e: Exception) {
+            android.util.Log.e(
+                "PopupService",
+                "Không cập nhật được widget",
+                e
+            )
+        }
     }
 
     private fun createNotificationChannel() {
@@ -149,30 +302,43 @@ val notification = buildNotification()
                 PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Popup thu gọn: hiển thị cả 3 mức pin trên cùng một hàng.
         val compactContent = RemoteViews(
             packageName,
             R.layout.notification_battery_compact
         ).apply {
-            setTextViewText(
-                R.id.notification_left,
-                "L  ${batteryText(leftBattery)}"
-            )
-            setTextViewText(
-                R.id.notification_case,
-                "Hộp  ${batteryText(caseBattery)}"
-            )
-            setTextViewText(
-                R.id.notification_right,
-                "R  ${batteryText(rightBattery)}"
-            )
+            if (isDeviceConnected) {
+                setTextViewText(
+                    R.id.notification_left,
+                    "L  ${batteryText(leftBattery)}"
+                )
+                setTextViewText(
+                    R.id.notification_case,
+                    "Hộp  ${batteryText(caseBattery)}"
+                )
+                setTextViewText(
+                    R.id.notification_right,
+                    "R  ${batteryText(rightBattery)}"
+                )
+            } else {
+                setTextViewText(
+                    R.id.notification_left,
+                    "Đã ngắt kết nối"
+                )
+                setTextViewText(
+                    R.id.notification_case,
+                    "L ${batteryText(leftBattery)}"
+                )
+                setTextViewText(
+                    R.id.notification_right,
+                    "R ${batteryText(rightBattery)}"
+                )
+            }
 
             setTextColor(R.id.notification_left, primaryTextColor)
             setTextColor(R.id.notification_case, primaryTextColor)
             setTextColor(R.id.notification_right, primaryTextColor)
         }
 
-        // Popup mở rộng: giữ bố cục 3 ô, không cần nền riêng từng ô.
         val expandedContent = RemoteViews(
             packageName,
             R.layout.notification_battery
@@ -181,6 +347,7 @@ val notification = buildNotification()
                 R.id.notification_device_name,
                 deviceName
             )
+
             setTextViewText(
                 R.id.notification_left,
                 batteryText(leftBattery)
@@ -198,56 +365,97 @@ val notification = buildNotification()
                 R.id.notification_device_name,
                 primaryTextColor
             )
-            setTextColor(R.id.notification_left, primaryTextColor)
-            setTextColor(R.id.notification_case, primaryTextColor)
-            setTextColor(R.id.notification_right, primaryTextColor)
-            setTextColor(R.id.notification_total, secondaryTextColor)
+            setTextColor(
+                R.id.notification_left,
+                primaryTextColor
+            )
+            setTextColor(
+                R.id.notification_case,
+                primaryTextColor
+            )
+            setTextColor(
+                R.id.notification_right,
+                primaryTextColor
+            )
+            setTextColor(
+                R.id.notification_total,
+                secondaryTextColor
+            )
 
             val hasSeparateBattery =
                 leftBattery in 0..100 ||
                 rightBattery in 0..100 ||
                 caseBattery in 0..100
 
+            val status = when {
+                !isDeviceConnected -> "Đã ngắt kết nối"
+                hasSeparateBattery -> "Đã cập nhật pin tai nghe"
+                batteryLevel in 0..100 ->
+                    "Pin Bluetooth: ${batteryText(batteryLevel)}"
+                else -> "Đang chờ dữ liệu pin"
+            }
+
             setTextViewText(
                 R.id.notification_total,
-                if (hasSeparateBattery) {
-                    "Đã cập nhật pin tai nghe"
-                } else if (batteryLevel in 0..100) {
-                    "Pin Bluetooth: ${batteryText(batteryLevel)}"
-                } else {
-                    "Đang chờ dữ liệu pin"
-                }
+                status
             )
         }
 
-        val summary = if (
+        val summary = when {
+            !isDeviceConnected -> "Đã ngắt kết nối Bluetooth"
             leftBattery in 0..100 ||
-            rightBattery in 0..100 ||
-            caseBattery in 0..100
-        ) {
-            "L ${batteryText(leftBattery)} · " +
-                "Hộp ${batteryText(caseBattery)} · " +
-                "R ${batteryText(rightBattery)}"
-        } else if (batteryLevel in 0..100) {
-            "Pin Bluetooth: ${batteryText(batteryLevel)}"
-        } else {
-            "Đang theo dõi kết nối Bluetooth"
+                rightBattery in 0..100 ||
+                caseBattery in 0..100 -> {
+                "L ${batteryText(leftBattery)} · " +
+                    "Hộp ${batteryText(caseBattery)} · " +
+                    "R ${batteryText(rightBattery)}"
+            }
+            batteryLevel in 0..100 ->
+                "Pin Bluetooth: ${batteryText(batteryLevel)}"
+            else -> "Đang chờ dữ liệu pin"
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-            .setContentTitle(deviceName)
+            .setSmallIcon(
+                android.R.drawable.stat_sys_data_bluetooth
+            )
+            .setContentTitle(
+                if (isDeviceConnected) {
+                    deviceName
+                } else {
+                    "$deviceName · Đã ngắt kết nối"
+                }
+            )
             .setContentText(summary)
             .setCustomContentView(compactContent)
             .setCustomBigContentView(expandedContent)
             .setCustomHeadsUpContentView(compactContent)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setStyle(
+                NotificationCompat.DecoratedCustomViewStyle()
+            )
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .build()
+    }
+
+    override fun onDestroy() {
+        if (receiverRegistered) {
+            try {
+                unregisterReceiver(bluetoothReceiver)
+            } catch (e: Exception) {
+                android.util.Log.w(
+                    "PopupService",
+                    "Bluetooth receiver đã được gỡ",
+                    e
+                )
+            }
+            receiverRegistered = false
+        }
+
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
