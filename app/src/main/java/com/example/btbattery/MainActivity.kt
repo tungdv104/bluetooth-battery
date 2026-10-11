@@ -519,8 +519,9 @@ class MainActivity : Activity() {
         row.addView(
             makeBatteryTile("CASE", "▱", null),
             LinearLayout.LayoutParams(0, dp(124), 1f).apply {
-                marginHorizontal = dp(3)
-            }
+    leftMargin = dp(3)
+    rightMargin = dp(3)
+}
         )
 
         row.addView(
