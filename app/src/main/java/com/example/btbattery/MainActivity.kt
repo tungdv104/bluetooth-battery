@@ -39,7 +39,7 @@ class MainActivity : AppCompatActivity() {
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action != BluetoothDevice.ACTION_BATTERY_LEVEL_CHANGED) {
+            if (intent.action != android.bluetooth.device.action.BATTERY_LEVEL_CHANGED) {
                 return
             }
 
@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val level = intent.getIntExtra(
-                BluetoothDevice.EXTRA_BATTERY_LEVEL, -1
+                android.bluetooth.device.extra.BATTERY_LEVEL, -1
             )
 
             if (device != null && level in 0..100) {
@@ -108,7 +108,7 @@ class MainActivity : AppCompatActivity() {
 
         if (!receiverRegistered) {
             val filter = IntentFilter(
-                BluetoothDevice.ACTION_BATTERY_LEVEL_CHANGED
+                android.bluetooth.device.action.BATTERY_LEVEL_CHANGED
             )
             ContextCompat.registerReceiver(
                 this,
