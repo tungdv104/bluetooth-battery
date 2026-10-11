@@ -54,9 +54,10 @@ class MainActivity : AppCompatActivity() {
                 intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
             }
 
-            val level = intent.getIntExtra(
-                ""android.bluetooth.device.extra.BATTERY_LEVEL"", -1
-            )
+val level = intent.getIntExtra(
+    "android.bluetooth.device.extra.BATTERY_LEVEL",
+    -1
+)
 
             if (device != null && level in 0..100) {
                 val name = try {
