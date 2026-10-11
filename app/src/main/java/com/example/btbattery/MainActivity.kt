@@ -1,4 +1,3 @@
-
 package com.example.btbattery
 
 import android.Manifest
@@ -34,7 +33,9 @@ class MainActivity : Activity() {
         linkedMapOf<String, BluetoothDevice>()
 
     private val batteryLevels = mutableMapOf<String, Int>()
-
+    private val peatsBatteryStates = mutableMapOf<String, PeatsBatteryState>()
+    private val peatsReadInProgress = mutableSetOf<String>()
+    private val peatsLastReadAt = mutableMapOf<String, Long>()
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var receiverRegistered = false
     private var refreshing = false
@@ -66,7 +67,7 @@ class MainActivity : Activity() {
 
                     if (device != null) {
                         connectedDevices[device.address] = device
-
+                        readPeatsBatteryIfSupported(device)
                         val level = getBatteryLevel(device)
                         sendNotification(device, level)
                     }
@@ -348,7 +349,44 @@ class MainActivity : Activity() {
             }
         }
     }
+    @Suppress("MissingPermission")
+private fun readPeatsBatteryIfSupported(device: BluetoothDevice) {
+    val name = getDeviceName(device).lowercase()
+    val likelySoundPeats =
+        name.contains("soundpeats") ||
+        name.contains("pearlclip") ||
+        name.contains("pearl clip") ||
+        name.contains("pearclip")
 
+    if (!likelySoundPeats) return
+
+    val address = device.address
+    val now = System.currentTimeMillis()
+    if (address in peatsReadInProgress) return
+    if (now - (peatsLastReadAt[address] ?: 0L) < 15_000L) return
+
+    peatsReadInProgress.add(address)
+    peatsLastReadAt[address] = now
+
+    PeatsBatteryReader(device).read { state, error ->
+        runOnUiThread {
+            peatsReadInProgress.remove(address)
+            if (state != null && state.hasAnyValue) {
+                peatsBatteryStates[address] = state
+                android.util.Log.i(
+                    "PeatsBatteryReader",
+                    "Battery result for $name: L=${state.left}, R=${state.right}, case=${state.case}"
+                )
+                refreshUI()
+            } else {
+                android.util.Log.w(
+                    "PeatsBatteryReader",
+                    "Could not read $name: ${error ?: "unknown error"}"
+                )
+            }
+        }
+    }
+}
     @Suppress("MissingPermission")
     private fun refreshConnectedDevices() {
         if (refreshing) return
@@ -380,7 +418,7 @@ class MainActivity : Activity() {
                         try {
                             for (device in proxy.connectedDevices) {
                                 connectedDevices[device.address] = device
-
+                                readPeatsBatteryIfSupported(device)
                                 val level = getBatteryLevel(device)
 
                                 if (level in 0..100) {
@@ -475,10 +513,10 @@ class MainActivity : Activity() {
             putExtra(
                 PopupService.EXTRA_BATTERY_LEVEL,
                 if (level in 0..100) {
-                    level
-                } else {
-                    batteryLevels[device.address] ?: -1
-                }
+    level
+} else {
+    batteryLevels[device.address] ?: -1
+}
             )
         }
 
@@ -553,14 +591,14 @@ class MainActivity : Activity() {
 
         for (device in devices) {
             val level = batteryLevels[device.address]
-                ?: getBatteryLevel(device).takeIf {
-                    it in 0..100
-                }
+    ?: getBatteryLevel(device).takeIf {
+        it in 0..100
+    }
 
-            if (level != null && level in 0..100) {
-                batteryLevels[device.address] = level
-                known++
-            }
+if (level != null && level in 0..100) {
+    batteryLevels[device.address] = level
+    known++
+}
 
             val item = glassCard(24).apply {
                 orientation = LinearLayout.VERTICAL
@@ -587,21 +625,21 @@ class MainActivity : Activity() {
                     letterSpacing = 0.07f
                 }
             )
-
+            val peats = peatsBatteryStates[device.address]
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
             }
 
             row.addView(
-                batteryTile("TRÁI", "L", null),
+                batteryTile("TRÁI", "L", peats?.left),
                 LinearLayout.LayoutParams(0, dp(115), 1f).apply {
                     marginEnd = dp(4)
                 }
             )
 
             row.addView(
-                batteryTile("HỘP SẠC", "▱", null),
+                batteryTile("HỘP SẠC", "C", peats?.case),
                 LinearLayout.LayoutParams(0, dp(115), 1f).apply {
                     leftMargin = dp(3)
                     rightMargin = dp(3)
@@ -609,7 +647,7 @@ class MainActivity : Activity() {
             )
 
             row.addView(
-                batteryTile("PHẢI", "R", null),
+                batteryTile("PHẢI", "R", peats?.right),
                 LinearLayout.LayoutParams(0, dp(115), 1f).apply {
                     marginStart = dp(4)
                 }
