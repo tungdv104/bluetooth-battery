@@ -67,13 +67,12 @@
             android:layout_marginHorizontal="2dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="#26364A"
             android:padding="4dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="▱"
+                android:text="C"
                 android:textColor="#79E7B0"
                 android:textSize="21sp" />
 
@@ -102,7 +101,6 @@
             android:layout_marginStart="4dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="#26364A"
             android:padding="4dp">
 
             <TextView
