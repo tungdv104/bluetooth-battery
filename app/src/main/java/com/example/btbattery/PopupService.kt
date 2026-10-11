@@ -83,22 +83,25 @@ class PopupService : Service() {
 
             // Đọc pin thật bằng reader hiện có của dự án.
             try {
-                PeatsBatteryReader(device).read { state, error ->
-                    mainHandler.post {
-                        if (state != null && state.hasAnyValue) {
-                            leftBattery = state.left
-                            rightBattery = state.right
-                            caseBattery = state.case
+                
+PeatsBatteryReader(device).read { state, error ->
+    mainHandler.post {
+        if (state != null && state.hasAnyValue) {
+            leftBattery = state.left ?: -1
+            rightBattery = state.right ?: -1
+            caseBattery = state.case ?: -1
 
-                            updateNotification()
-                            showAirPodsPopup()
-                        } else {
-                            android.util.Log.w(
-                                "PopupService",
-                                "Không đọc được pin sau khi kết nối: $error"
-                            )
-                        }
-                    }
+            updateNotification()
+            showAirPodsPopup()
+        } else {
+            android.util.Log.w(
+                "PopupService",
+                "Không đọc được pin sau khi kết nối: $error"
+            )
+        }
+    }
+}
+
                 }
             } catch (e: Exception) {
                 android.util.Log.e(
