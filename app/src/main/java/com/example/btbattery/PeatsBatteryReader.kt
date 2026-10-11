@@ -180,89 +180,92 @@ class PeatsBatteryReader(private val device: BluetoothDevice) {
         return null
     }
 
-    private fun readMatchingReply(
-        socket: BluetoothSocket,
-        command: Int
-    ): Int? {
-        val input = socket.inputStream
-        val bytes = ArrayList<Int>()
-        val deadline = System.currentTimeMillis() + RESPONSE_TIMEOUT_MS
+    
+private fun readMatchingReply(
+    socket: BluetoothSocket,
+    command: Int
+): Int? {
+    val input = socket.inputStream
+    val bytes = ArrayList<Int>()
+    val deadline = System.currentTimeMillis() + RESPONSE_TIMEOUT_MS
 
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                if (!socket.isConnected) {
-                    Log.w(TAG, "Socket disconnected while waiting for reply")
-                    logRaw(bytes)
-                    return null
-                }
-
-                if (input.available() <= 0) {
-                    Thread.sleep(20)
-                    continue
-                }
-
-                val next = input.read()
-
-                if (next < 0) {
-                    Log.w(TAG, "EOF while waiting for command 03 " +
-                        command.toString(16))
-                    logRaw(bytes)
-                    return null
-                }
-
-                bytes.add(next and 0xFF)
-
-                // Reply format observed on SoundPEATS H3:
-                // FF 03 00 02 00 0A 83 <command> 00 <battery>
-                if (bytes.size >= 10) {
-                    val start = bytes.size - 10
-
-                    val matches =
-                        bytes[start] == 0xFF &&
-                        bytes[start + 1] == 0x03 &&
-                        bytes[start + 2] == 0x00 &&
-                        bytes[start + 3] == 0x02 &&
-                        bytes[start + 4] == 0x00 &&
-                        bytes[start + 5] == 0x0A &&
-                        bytes[start + 6] == 0x83 &&
-                        bytes[start + 7] == command &&
-                        bytes[start + 8] == 0x00
-
-                    if (matches) {
-                        val value = bytes[start + 9]
-                        if (value in 0..100) {
-                            logRaw(bytes)
-                            return value
-                        }
-                    }
-                }
-
-                // Avoid unbounded growth if the device sends unrelated data.
-                if (bytes.size > 128) {
-                    while (bytes.size > 32) {
-                        bytes.removeAt(0)
-                    }
-                }
-
-            } catch (e: InterruptedException) {
-                Thread.currentThread().interrupt()
-                logRaw(bytes)
-                return null
-
-            } catch (e: IOException) {
-                Log.w(TAG, "Read failed; socket may have closed", e)
+    while (System.currentTimeMillis() < deadline) {
+        try {
+            if (!socket.isConnected) {
+                Log.w(TAG, "Socket disconnected while waiting for reply")
                 logRaw(bytes)
                 return null
             }
-        }
 
-        Log.w(
-            TAG,
-            "Response timeout for command 03 ${command.toString(16)}"
-        )
-        logRaw(bytes)
-        return null
+            if (input.available() <= 0) {
+                Thread.sleep(20)
+                continue
+            }
+
+            val next = input.read()
+            if (next < 0) {
+                Log.w(TAG, "EOF waiting for command ${command.toString(16)}")
+                logRaw(bytes)
+                return null
+            }
+
+            bytes.add(next and 0xFF)
+
+            if (bytes.size >= 10) {
+                val start = bytes.size - 10
+
+                val version = bytes[start + 1]
+                val matches =
+                    bytes[start] == 0xFF &&
+                    (version == 0x03 || version == 0x04) &&
+                    bytes[start + 2] == 0x00 &&
+                    bytes[start + 3] == 0x02 &&
+                    bytes[start + 4] == 0x00 &&
+                    bytes[start + 5] == 0x0A &&
+                    bytes[start + 6] == 0x83 &&
+                    bytes[start + 7] == command &&
+                    bytes[start + 8] == 0x00
+
+                if (matches) {
+                    val value = bytes[start + 9]
+                    logRaw(bytes)
+
+                    if (value in 0..100) {
+                        Log.i(TAG, "Valid battery command=${command.toString(16)} value=$value")
+                        return value
+                    }
+
+                    Log.w(
+                        TAG,
+                        "Invalid battery value: 0x${value.toString(16).uppercase()} " +
+                            "($value), command=${command.toString(16)}"
+                    )
+                    return null
+                }
+            }
+
+            if (bytes.size > 128) {
+                while (bytes.size > 32) {
+                    bytes.removeAt(0)
+                }
+            }
+
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            logRaw(bytes)
+            return null
+        } catch (e: IOException) {
+            Log.w(TAG, "Read failed", e)
+            logRaw(bytes)
+            return null
+        }
     }
+
+    Log.w(TAG, "Response timeout for command ${command.toString(16)}")
+    logRaw(bytes)
+    return null
+}
+
 
     private fun logRaw(bytes: List<Int>) {
         val raw = if (bytes.isEmpty()) {
