@@ -705,4 +705,52 @@ class MainActivity : Activity() {
             background = rounded(card, radius)
             elevation = dp(2).toFloat()
         }
-    
+    }
+
+    private fun rounded(
+        color: Int,
+        radius: Int
+    ): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+            setStroke(
+                dp(1),
+                Color.argb(45, 185, 220, 255)
+            )
+        }
+    }
+
+    private fun text(
+        value: String,
+        size: Float,
+        color: Int,
+        bold: Boolean = false
+    ): TextView {
+        return TextView(this).apply {
+            text = value
+            textSize = size
+            setTextColor(color)
+
+            if (bold) {
+                setTypeface(null, Typeface.BOLD)
+            }
+        }
+    }
+
+    private fun matchWrap() =
+        LinearLayout.LayoutParams(-1, -2)
+
+    @Suppress("MissingPermission")
+    private fun getDeviceName(device: BluetoothDevice): String {
+        return try {
+            device.name?.takeIf { it.isNotBlank() }
+                ?: "Tai nghe Bluetooth"
+        } catch (_: SecurityException) {
+            "Tai nghe Bluetooth"
+        }
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+}
