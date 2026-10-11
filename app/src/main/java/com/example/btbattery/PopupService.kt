@@ -1,4 +1,3 @@
-
 package com.example.btbattery
 
 import android.app.Notification
@@ -6,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -38,13 +36,17 @@ class PopupService : Service() {
         startId: Int
     ): Int {
         intent?.let {
-            deviceName = it.getStringExtra(EXTRA_DEVICE_NAME)
-                ?: deviceName
+            deviceName = it.getStringExtra(
+                EXTRA_DEVICE_NAME
+            ) ?: deviceName
 
             val level = it.getIntExtra(
-                EXTRA_BATTERY_LEVEL, -1
+                EXTRA_BATTERY_LEVEL,
+                -1
             )
 
+            // Chỉ ghi đè khi có pin hợp lệ.
+            // Không làm mất % đã đọc được khi nhận -1.
             if (level in 0..100) {
                 batteryLevel = level
             }
@@ -60,7 +62,10 @@ class PopupService : Service() {
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
                 )
             } else {
-                startForeground(NOTIFICATION_ID, notification)
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification
+                )
             }
         } catch (_: Exception) {
             stopSelf()
@@ -81,11 +86,13 @@ class PopupService : Service() {
                 setShowBadge(false)
                 enableVibration(false)
                 setSound(null, null)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                lockscreenVisibility =
+                    Notification.VISIBILITY_PUBLIC
             }
 
-            getSystemService(NotificationManager::class.java)
-                .createNotificationChannel(channel)
+            getSystemService(
+                NotificationManager::class.java
+            ).createNotificationChannel(channel)
         }
     }
 
@@ -106,7 +113,7 @@ class PopupService : Service() {
                 PendingIntent.FLAG_IMMUTABLE
         )
 
-        val compact = RemoteViews(
+        val content = RemoteViews(
             packageName,
             R.layout.notification_battery
         ).apply {
@@ -119,10 +126,12 @@ class PopupService : Service() {
                 R.id.notification_left,
                 "—"
             )
+
             setTextViewText(
                 R.id.notification_case,
                 "—"
             )
+
             setTextViewText(
                 R.id.notification_right,
                 "—"
@@ -138,18 +147,26 @@ class PopupService : Service() {
             )
         }
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-            .setContentTitle(deviceName)
-            .setContentText(
-                if (batteryLevel in 0..100) {
-                    "Pin Bluetooth: $batteryLevel%"
-                } else {
-                    "Đang theo dõi kết nối"
-                }
+        val contentText = if (batteryLevel in 0..100) {
+            "Pin Bluetooth: $batteryLevel%"
+        } else {
+            "Đang theo dõi kết nối"
+        }
+
+        return NotificationCompat.Builder(
+            this,
+            CHANNEL_ID
+        )
+            .setSmallIcon(
+                android.R.drawable.stat_sys_data_bluetooth
             )
-            .setCustomContentView(compact)
-            .setCustomBigContentView(compact)
+            .setContentTitle(deviceName)
+            .setContentText(contentText)
+            .setCustomContentView(content)
+            .setCustomBigContentView(content)
+            .setStyle(
+                NotificationCompat.DecoratedCustomViewStyle()
+            )
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -158,5 +175,7 @@ class PopupService : Service() {
             .build()
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
+    }
 }
