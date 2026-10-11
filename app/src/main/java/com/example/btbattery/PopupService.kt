@@ -1,4 +1,3 @@
-
 package com.example.btbattery
 
 import android.app.Notification
@@ -6,25 +5,25 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.bluetooth.BluetoothDevice
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
-import android.util.TypedValue
+import android.util.Log
 import android.view.Gravity
-import android.view.WindowManager
 import android.view.View
+import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
@@ -78,37 +77,32 @@ class PopupService : Service() {
             rightBattery = -1
             caseBattery = -1
 
-            // Hiện popup ngay khi phát hiện kết nối.
+            // Hiện popup ngay khi kết nối.
             showAirPodsPopup()
-
-            // Đọc pin thật bằng reader hiện có của dự án.
-            try {
-                
-PeatsBatteryReader(device).read { state, error ->
-    mainHandler.post {
-        if (state != null && state.hasAnyValue) {
-            leftBattery = state.left ?: -1
-            rightBattery = state.right ?: -1
-            caseBattery = state.case ?: -1
-
             updateNotification()
-            showAirPodsPopup()
-        } else {
-            android.util.Log.w(
-                "PopupService",
-                "Không đọc được pin sau khi kết nối: $error"
-            )
-        }
-    }
-}
 
+            // Đọc pin riêng bằng reader hiện có của dự án.
+            try {
+                PeatsBatteryReader(device).read { state, error ->
+                    mainHandler.post {
+                        if (state != null && state.hasAnyValue) {
+                            leftBattery = state.left ?: -1
+                            rightBattery = state.right ?: -1
+                            caseBattery = state.case ?: -1
+
+                            updateNotification()
+                            showAirPodsPopup()
+                        } else {
+                            Log.w(
+                                "PopupService",
+                                "Không đọc được pin sau khi kết nối: " +
+                                    (error ?: "unknown error")
+                            )
+                        }
+                    }
                 }
             } catch (e: Exception) {
-                android.util.Log.e(
-                    "PopupService",
-                    "Lỗi đọc pin tai nghe",
-                    e
-                )
+                Log.e("PopupService", "Lỗi đọc pin tai nghe", e)
             }
         }
     }
@@ -130,19 +124,23 @@ PeatsBatteryReader(device).read { state, error ->
                 ?: deviceName
 
             batteryLevel = intent.getIntExtra(
-                EXTRA_BATTERY_LEVEL, -1
+                EXTRA_BATTERY_LEVEL,
+                -1
             ).takeIf { it in 0..100 } ?: -1
 
             leftBattery = intent.getIntExtra(
-                EXTRA_LEFT_BATTERY, -1
+                EXTRA_LEFT_BATTERY,
+                -1
             ).takeIf { it in 0..100 } ?: -1
 
             rightBattery = intent.getIntExtra(
-                EXTRA_RIGHT_BATTERY, -1
+                EXTRA_RIGHT_BATTERY,
+                -1
             ).takeIf { it in 0..100 } ?: -1
 
             caseBattery = intent.getIntExtra(
-                EXTRA_CASE_BATTERY, -1
+                EXTRA_CASE_BATTERY,
+                -1
             ).takeIf { it in 0..100 } ?: -1
         }
 
@@ -153,23 +151,24 @@ PeatsBatteryReader(device).read { state, error ->
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                    android.content.pm.ServiceInfo
+                        .FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
                 )
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
         } catch (e: Exception) {
-            android.util.Log.e(
-                "PopupService",
-                "Không thể chạy dịch vụ nền",
-                e
-            )
+            Log.e("PopupService", "Không thể chạy dịch vụ nền", e)
             stopSelf()
             return START_NOT_STICKY
         }
 
         return START_STICKY
     }
+
+    // --------------------------------------------------
+    // BLUETOOTH RECEIVER
+    // --------------------------------------------------
 
     private fun registerBluetoothReceiver() {
         if (receiverRegistered) return
@@ -192,13 +191,17 @@ PeatsBatteryReader(device).read { state, error ->
 
             receiverRegistered = true
         } catch (e: Exception) {
-            android.util.Log.e(
+            Log.e(
                 "PopupService",
                 "Không đăng ký được sự kiện Bluetooth",
                 e
             )
         }
     }
+
+    // --------------------------------------------------
+    // THÔNG BÁO ANDROID
+    // --------------------------------------------------
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -288,8 +291,8 @@ PeatsBatteryReader(device).read { state, error ->
 
         val summary =
             "L ${batteryText(leftBattery)} · " +
-            "Hộp ${batteryText(caseBattery)} · " +
-            "R ${batteryText(rightBattery)}"
+                "Hộp ${batteryText(caseBattery)} · " +
+                "R ${batteryText(rightBattery)}"
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(
@@ -315,7 +318,7 @@ PeatsBatteryReader(device).read { state, error ->
             getSystemService(NotificationManager::class.java)
                 .notify(NOTIFICATION_ID, buildNotification())
         } catch (e: Exception) {
-            android.util.Log.e(
+            Log.e(
                 "PopupService",
                 "Không cập nhật được thông báo pin",
                 e
@@ -328,8 +331,10 @@ PeatsBatteryReader(device).read { state, error ->
     // --------------------------------------------------
 
     private fun showAirPodsPopup() {
-        if (!Settings.canDrawOverlays(this)) {
-            android.util.Log.i(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            !Settings.canDrawOverlays(this)
+        ) {
+            Log.i(
                 "PopupService",
                 "Chưa được cấp quyền hiển thị popup nổi"
             )
@@ -341,6 +346,7 @@ PeatsBatteryReader(device).read { state, error ->
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(17), dp(14), dp(17), dp(15))
+
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dp(25).toFloat()
@@ -350,6 +356,7 @@ PeatsBatteryReader(device).read { state, error ->
                     Color.argb(110, 180, 218, 255)
                 )
             }
+
             elevation = dp(12).toFloat()
         }
 
@@ -362,33 +369,34 @@ PeatsBatteryReader(device).read { state, error ->
             orientation = LinearLayout.VERTICAL
         }
 
-        nameColumn.addView(popupText(
-            deviceName,
-            14f,
-            Color.WHITE,
-            true
-        ))
+        nameColumn.addView(
+            popupText(deviceName, 14f, Color.WHITE, true)
+        )
 
-        nameColumn.addView(popupText(
-            "Đã kết nối",
-            11f,
-            Color.rgb(111, 240, 177),
-            false
-        ).apply {
-            setPadding(0, dp(3), 0, 0)
-        })
+        nameColumn.addView(
+            popupText(
+                "Đã kết nối",
+                11f,
+                Color.rgb(111, 240, 177),
+                false
+            ).apply {
+                setPadding(0, dp(3), 0, 0)
+            }
+        )
 
         heading.addView(
             nameColumn,
             LinearLayout.LayoutParams(0, -2, 1f)
         )
 
-        heading.addView(popupText(
-            "BT",
-            12f,
-            Color.rgb(113, 218, 255),
-            true
-        ))
+        heading.addView(
+            popupText(
+                "BT",
+                12f,
+                Color.rgb(113, 218, 255),
+                true
+            )
+        )
 
         root.addView(heading)
 
@@ -413,10 +421,12 @@ PeatsBatteryReader(device).read { state, error ->
             popupBatteryTile("TRÁI", leftBattery),
             LinearLayout.LayoutParams(0, -2, 1f)
         )
+
         batteryRow.addView(
             popupBatteryTile("HỘP SẠC", caseBattery),
             LinearLayout.LayoutParams(0, -2, 1f)
         )
+
         batteryRow.addView(
             popupBatteryTile("PHẢI", rightBattery),
             LinearLayout.LayoutParams(0, -2, 1f)
@@ -426,6 +436,7 @@ PeatsBatteryReader(device).read { state, error ->
 
         root.setOnClickListener {
             removeAirPodsPopup()
+
             val open = Intent(
                 this,
                 MainActivity::class.java
@@ -433,6 +444,7 @@ PeatsBatteryReader(device).read { state, error ->
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
+
             startActivity(open)
         }
 
@@ -445,12 +457,15 @@ PeatsBatteryReader(device).read { state, error ->
             }
 
         val params = WindowManager.LayoutParams(
-            minOf(dp(340), resources.displayMetrics.widthPixels - dp(24)),
+            minOf(
+                dp(340),
+                resources.displayMetrics.widthPixels - dp(24)
+            ),
             WindowManager.LayoutParams.WRAP_CONTENT,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            android.graphics.PixelFormat.TRANSLUCENT
+            PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             y = dp(64)
@@ -466,7 +481,7 @@ PeatsBatteryReader(device).read { state, error ->
                 POPUP_DURATION
             )
         } catch (e: Exception) {
-            android.util.Log.e(
+            Log.e(
                 "PopupService",
                 "Không thể hiển thị popup nổi",
                 e
@@ -483,21 +498,25 @@ PeatsBatteryReader(device).read { state, error ->
             gravity = Gravity.CENTER
             setPadding(dp(3), dp(5), dp(3), dp(3))
 
-            addView(popupText(
-                label,
-                9f,
-                Color.rgb(164, 180, 201),
-                true
-            ))
+            addView(
+                popupText(
+                    label,
+                    9f,
+                    Color.rgb(164, 180, 201),
+                    true
+                )
+            )
 
-            addView(popupText(
-                batteryText(value),
-                19f,
-                Color.WHITE,
-                true
-            ).apply {
-                setPadding(0, dp(4), 0, 0)
-            })
+            addView(
+                popupText(
+                    batteryText(value),
+                    19f,
+                    Color.WHITE,
+                    true
+                ).apply {
+                    setPadding(0, dp(4), 0, 0)
+                }
+            )
         }
     }
 
@@ -511,7 +530,9 @@ PeatsBatteryReader(device).read { state, error ->
             text = value
             textSize = size
             setTextColor(color)
+
             if (bold) setTypeface(null, Typeface.BOLD)
+
             gravity = Gravity.CENTER_VERTICAL
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -522,18 +543,25 @@ PeatsBatteryReader(device).read { state, error ->
         mainHandler.removeCallbacks(hidePopupRunnable)
 
         val current = popupView ?: return
+
         try {
             windowManager.removeView(current)
         } catch (_: Exception) {
         }
+
         popupView = null
     }
+
+    // --------------------------------------------------
+    // TIỆN ÍCH
+    // --------------------------------------------------
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
     private fun isSoundPeats(name: String): Boolean {
         val value = name.lowercase()
+
         return value.contains("soundpeats") ||
             value.contains("pearlclip") ||
             value.contains("pearl clip") ||
@@ -550,9 +578,7 @@ PeatsBatteryReader(device).read { state, error ->
         }
     }
 
-    private fun getDeviceFromIntent(
-        intent: Intent
-    ): BluetoothDevice? {
+    private fun getDeviceFromIntent(intent: Intent): BluetoothDevice? {
         return try {
             if (Build.VERSION.SDK_INT >= 33) {
                 intent.getParcelableExtra(
@@ -561,9 +587,7 @@ PeatsBatteryReader(device).read { state, error ->
                 )
             } else {
                 @Suppress("DEPRECATION")
-                intent.getParcelableExtra(
-                    BluetoothDevice.EXTRA_DEVICE
-                )
+                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
             }
         } catch (_: Exception) {
             null
@@ -579,6 +603,7 @@ PeatsBatteryReader(device).read { state, error ->
                 unregisterReceiver(bluetoothReceiver)
             } catch (_: Exception) {
             }
+
             receiverRegistered = false
         }
 
