@@ -72,9 +72,9 @@ class MainActivity : Activity() {
                 "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED" -> {
                     val device = getDeviceFromIntent(intent) ?: return
                     val level = intent.getIntExtra(
-                        BluetoothDevice.EXTRA_BATTERY_LEVEL,
-                        -1
-                    )
+    "android.bluetooth.device.extra.BATTERY_LEVEL",
+    -1
+)
 
                     if (level in 0..100) {
                         batteryLevels[device.address] = level
