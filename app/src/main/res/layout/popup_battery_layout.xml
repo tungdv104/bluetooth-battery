@@ -1,88 +1,156 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@android:color/transparent"
-    android:orientation="horizontal"
-    android:padding="16dp"
-    android:gravity="center">
+    android:orientation="vertical"
+    android:padding="14dp"
+    android:background="#E61A263B">
 
-    <!-- Khung kính mờ chứa thông tin pin -->
-    <LinearLayout
-        android:layout_width="wrap_content"
+    <TextView
+        android:id="@+id/notification_device_name"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#991C1C1C"
-        android:padding="12dp"
+        android:text="Tai nghe Bluetooth"
+        android:textColor="#FFFFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingBottom="10dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center">
+        android:gravity="center"
+        android:weightSum="3">
 
-        <!-- 1. Bên trái (L) -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
             android:gravity="center"
-            android:orientation="horizontal"
-            android:layout_marginEnd="16dp">
+            android:padding="8dp"
+            android:background="#B8293C55">
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="L "
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
+                android:text="L"
+                android:textColor="#FF79D9FF"
+                android:textSize="19sp"
                 android:textStyle="bold" />
+
             <TextView
-                android:id="@+id/txtLeftBattery"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="80%"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp" />
+                android:text="TRÁI"
+                android:textColor="#FFB9C9DC"
+                android:textSize="9sp"
+                android:paddingTop="3dp" />
+
+            <TextView
+                android:id="@+id/notification_left"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingTop="3dp" />
         </LinearLayout>
 
-        <!-- 2. Hộp sạc (Case) -->
+        <View
+            android:layout_width="5dp"
+            android:layout_height="1dp" />
+
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
             android:gravity="center"
-            android:orientation="horizontal"
-            android:layout_marginEnd="16dp">
+            android:padding="8dp"
+            android:background="#B8293C55">
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Case "
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
+                android:text="▱"
+                android:textColor="#FF79D9FF"
+                android:textSize="19sp"
                 android:textStyle="bold" />
+
             <TextView
-                android:id="@+id/txtCaseBattery"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="91%"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp" />
+                android:text="HỘP SẠC"
+                android:textColor="#FFB9C9DC"
+                android:textSize="9sp"
+                android:paddingTop="3dp" />
+
+            <TextView
+                android:id="@+id/notification_case"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingTop="3dp" />
         </LinearLayout>
 
-        <!-- 3. Bên phải (R) -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:orientation="horizontal">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="R "
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-            <TextView
-                android:id="@+id/txtRightBattery"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="100%"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp" />
-        </LinearLayout>
+        <View
+            android:layout_width="5dp"
+            android:layout_height="1dp" />
 
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="8dp"
+            android:background="#B8293C55">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="R"
+                android:textColor="#FF79D9FF"
+                android:textSize="19sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PHẢI"
+                android:textColor="#FFB9C9DC"
+                android:textSize="9sp"
+                android:paddingTop="3dp" />
+
+            <TextView
+                android:id="@+id/notification_right"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingTop="3dp" />
+        </LinearLayout>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/notification_total"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Đang chờ dữ liệu pin"
+        android:textColor="#FF79E6BC"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:paddingTop="12dp" />
+
 </LinearLayout>
