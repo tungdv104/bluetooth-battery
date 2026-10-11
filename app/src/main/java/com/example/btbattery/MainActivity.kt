@@ -37,6 +37,7 @@ class MainActivity : Activity() {
 
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var receiverRegistered = false
+    private var refreshing = false
 
     private val bg = Color.rgb(8, 12, 24)
     private val card = Color.rgb(28, 38, 58)
@@ -61,14 +62,12 @@ class MainActivity : Activity() {
 
             when (intent.action) {
                 BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                    getDeviceFromIntent(intent)?.let { device ->
+                    val device = getDeviceFromIntent(intent)
+
+                    if (device != null) {
                         connectedDevices[device.address] = device
 
                         val level = getBatteryLevel(device)
-                        if (level in 0..100) {
-                            batteryLevels[device.address] = level
-                        }
-
                         sendNotification(device, level)
                     }
 
@@ -76,19 +75,25 @@ class MainActivity : Activity() {
                 }
 
                 BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                    getDeviceFromIntent(intent)?.let { device ->
+                    val device = getDeviceFromIntent(intent)
+
+                    if (device != null) {
                         connectedDevices.remove(device.address)
+                        batteryLevels.remove(device.address)
                     }
 
                     refreshUI()
                 }
 
                 ACTION_BATTERY_CHANGED -> {
-                    getDeviceFromIntent(intent)?.let { device ->
+                    val device = getDeviceFromIntent(intent)
+
+                    if (device != null) {
                         connectedDevices[device.address] = device
 
                         val level = intent.getIntExtra(
-                            EXTRA_BATTERY_LEVEL, -1
+                            EXTRA_BATTERY_LEVEL,
+                            -1
                         )
 
                         if (level in 0..100) {
@@ -126,7 +131,6 @@ class MainActivity : Activity() {
 
         window.statusBarColor = bg
         window.navigationBarColor = bg
-        window.decorView.systemUiVisibility = 0
 
         buildUI()
         requestBluetoothPermissions()
@@ -248,7 +252,7 @@ class MainActivity : Activity() {
 
         content.addView(
             text(
-                "Pin riêng từng bên và hộp sạc chỉ hiện khi tai nghe cung cấp dữ liệu.",
+                "Pin riêng từng bên và hộp sạc chỉ hiển thị khi tai nghe cung cấp dữ liệu.",
                 10f,
                 muted
             ).apply {
@@ -347,19 +351,23 @@ class MainActivity : Activity() {
 
     @Suppress("MissingPermission")
     private fun refreshConnectedDevices() {
+        if (refreshing) return
+
         val adapter = bluetoothAdapter ?: run {
-            statusText.text = "Không hỗ trợ Bluetooth"
-            refreshUI()
+            if (::statusText.isInitialized) {
+                statusText.text = "Không hỗ trợ Bluetooth"
+            }
             return
         }
 
         try {
             if (!adapter.isEnabled) {
                 connectedDevices.clear()
-                statusText.text = "Bluetooth đang tắt"
                 refreshUI()
                 return
             }
+
+            refreshing = true
 
             adapter.getProfileProxy(
                 this,
@@ -373,9 +381,7 @@ class MainActivity : Activity() {
                             for (device in proxy.connectedDevices) {
                                 connectedDevices[device.address] = device
 
-                                val level =
-                                    batteryLevels[device.address]
-                                        ?: getBatteryLevel(device)
+                                val level = getBatteryLevel(device)
 
                                 if (level in 0..100) {
                                     batteryLevels[device.address] = level
@@ -387,6 +393,8 @@ class MainActivity : Activity() {
                             refreshUI()
                         } catch (_: Exception) {
                         } finally {
+                            refreshing = false
+
                             try {
                                 adapter.closeProfileProxy(profile, proxy)
                             } catch (_: Exception) {
@@ -394,36 +402,28 @@ class MainActivity : Activity() {
                         }
                     }
 
-                    override fun onServiceDisconnected(profile: Int) {}
+                    override fun onServiceDisconnected(profile: Int) {
+                        refreshing = false
+                    }
                 },
                 BluetoothProfile.A2DP
             )
         } catch (_: Exception) {
-            statusText.text = "Không đọc được trạng thái Bluetooth"
+            refreshing = false
+
+            if (::statusText.isInitialized) {
+                statusText.text = "Không đọc được trạng thái Bluetooth"
+            }
         }
     }
 
     /**
-     * Đọc mức pin Bluetooth mà Android cung cấp.
-     * - Ưu tiên API batteryLevel trên Android 13+.
-     * - Nếu không có dữ liệu, thử getBatteryLevel bằng reflection.
-     * - Không tự tạo hoặc suy đoán phần trăm pin.
+     * Đọc mức pin qua phương thức mà một số ROM cung cấp.
+     * Không dùng BluetoothDevice.batteryLevel vì SDK dự án
+     * hiện tại không khai báo thuộc tính đó.
      */
     @Suppress("MissingPermission", "DEPRECATION")
     private fun getBatteryLevel(device: BluetoothDevice): Int {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            try {
-                val level = device.batteryLevel
-
-                if (level in 0..100) {
-                    batteryLevels[device.address] = level
-                    return level
-                }
-            } catch (_: Exception) {
-                // Tiếp tục thử API tương thích bên dưới.
-            }
-        }
-
         try {
             val method = device.javaClass.getMethod("getBatteryLevel")
             val level = method.invoke(device) as? Int ?: -1
@@ -433,7 +433,7 @@ class MainActivity : Activity() {
                 return level
             }
         } catch (_: Exception) {
-            // API này có thể không được ROM hỗ trợ.
+            // API ẩn có thể không được ROM hỗ trợ.
         }
 
         return batteryLevels[device.address] ?: -1
@@ -474,9 +474,11 @@ class MainActivity : Activity() {
 
             putExtra(
                 PopupService.EXTRA_BATTERY_LEVEL,
-                level.takeIf { it in 0..100 }
-                    ?: batteryLevels[device.address]
-                    ?: -1
+                if (level in 0..100) {
+                    level
+                } else {
+                    batteryLevels[device.address] ?: -1
+                }
             )
         }
 
@@ -617,7 +619,7 @@ class MainActivity : Activity() {
 
             item.addView(
                 text(
-                    if (level in 0..100) {
+                    if (level != null && level in 0..100) {
                         "PIN TỔNG  ·  $level%"
                     } else {
                         "PIN TỔNG  ·  Chưa có dữ liệu"
@@ -703,53 +705,4 @@ class MainActivity : Activity() {
             background = rounded(card, radius)
             elevation = dp(2).toFloat()
         }
-    }
-
-    private fun rounded(
-        color: Int,
-        radius: Int
-    ): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radius).toFloat()
-            setStroke(
-                dp(1),
-                Color.argb(45, 185, 220, 255)
-            )
-        }
-    }
-
-    private fun text(
-        value: String,
-        size: Float,
-        color: Int,
-        bold: Boolean = false
-    ): TextView {
-        return TextView(this).apply {
-            text = value
-            textSize = size
-            setTextColor(color)
-
-            if (bold) {
-                setTypeface(null, Typeface.BOLD)
-            }
-        }
-    }
-
-    private fun matchWrap() =
-        LinearLayout.LayoutParams(-1, -2)
-
-    private fun getDeviceName(
-        device: BluetoothDevice
-    ): String {
-        return try {
-            device.name?.takeIf { it.isNotBlank() }
-                ?: "Tai nghe Bluetooth"
-        } catch (_: SecurityException) {
-            "Tai nghe Bluetooth"
-        }
-    }
-
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
-}
+    
