@@ -1,5 +1,7 @@
 package com.example.btbattery
 
+import android.app.NotificationManager
+import android.provider.Settings
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -52,6 +54,17 @@ class MainActivity : AppCompatActivity() {
         
         listView = ListView(this)
         setContentView(listView)
+        if (Build.VERSION.SDK_INT >= 33) {
+    if (checkSelfPermission(
+            Manifest.permission.POST_NOTIFICATIONS
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {
+        requestPermissions(
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            102
+        )
+    }
+}
 
         adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, deviceList)
         listView.adapter = adapter
