@@ -5,8 +5,9 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="12dp"
-    android:background="#171C1E">
+    android:background="@drawable/bg_notification_glass">
 
+    <!-- Tên thiết bị -->
     <TextView
         android:id="@+id/notification_device_name"
         android:layout_width="match_parent"
@@ -19,12 +20,14 @@
         android:ellipsize="end"
         android:paddingBottom="12dp" />
 
+    <!-- Ba ô pin -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:weightSum="3">
 
+        <!-- Tai trái -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="76dp"
@@ -32,7 +35,7 @@
             android:layout_marginEnd="4dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="#29312F">
+            android:background="@drawable/bg_notification_tile">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -59,6 +62,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Hộp sạc -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="76dp"
@@ -67,7 +71,7 @@
             android:layout_marginEnd="2dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="#29312F">
+            android:background="@drawable/bg_notification_tile">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -93,6 +97,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Tai phải -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="76dp"
@@ -100,7 +105,7 @@
             android:layout_marginStart="4dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="#29312F">
+            android:background="@drawable/bg_notification_tile">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -126,8 +131,10 @@
                 android:textSize="16sp"
                 android:textStyle="bold" />
         </LinearLayout>
+
     </LinearLayout>
 
+    <!-- Trạng thái pin -->
     <TextView
         android:id="@+id/notification_total"
         android:layout_width="match_parent"
