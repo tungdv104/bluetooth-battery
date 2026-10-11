@@ -5,14 +5,13 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="12dp"
-    android:background="@drawable/bg_notification_glass">
+    android:background="#171E2B">
 
-    <!-- Tên thiết bị -->
     <TextView
         android:id="@+id/notification_device_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Tai nghe Bluetooth"
+        android:text="SoundPEATS PearlClip Pro"
         android:textColor="#FFFFFF"
         android:textSize="15sp"
         android:textStyle="bold"
@@ -20,7 +19,6 @@
         android:ellipsize="end"
         android:paddingBottom="12dp" />
 
-    <!-- Ba ô pin -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -30,26 +28,27 @@
         <!-- Tai trái -->
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="76dp"
+            android:layout_height="88dp"
             android:layout_weight="1"
             android:layout_marginEnd="4dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="@drawable/bg_notification_tile">
+            android:background="#26364A"
+            android:padding="4dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="L"
-                android:textColor="#5BE691"
-                android:textSize="20sp"
+                android:textColor="#79E7B0"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="TRÁI"
-                android:textColor="#C5CDCA"
+                android:textColor="#BAC9DA"
                 android:textSize="10sp" />
 
             <TextView
@@ -58,33 +57,33 @@
                 android:layout_height="wrap_content"
                 android:text="—"
                 android:textColor="#FFFFFF"
-                android:textSize="16sp"
+                android:textSize="19sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <!-- Hộp sạc -->
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="76dp"
+            android:layout_height="88dp"
             android:layout_weight="1"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
+            android:layout_marginHorizontal="2dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="@drawable/bg_notification_tile">
+            android:background="#26364A"
+            android:padding="4dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="▱"
-                android:textColor="#5BE691"
-                android:textSize="20sp" />
+                android:textColor="#79E7B0"
+                android:textSize="21sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="CASE"
-                android:textColor="#C5CDCA"
+                android:text="HỘP SẠC"
+                android:textColor="#BAC9DA"
                 android:textSize="10sp" />
 
             <TextView
@@ -93,33 +92,34 @@
                 android:layout_height="wrap_content"
                 android:text="—"
                 android:textColor="#FFFFFF"
-                android:textSize="16sp"
+                android:textSize="19sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <!-- Tai phải -->
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="76dp"
+            android:layout_height="88dp"
             android:layout_weight="1"
             android:layout_marginStart="4dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:background="@drawable/bg_notification_tile">
+            android:background="#26364A"
+            android:padding="4dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="R"
-                android:textColor="#5BE691"
-                android:textSize="20sp"
+                android:textColor="#79E7B0"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="PHẢI"
-                android:textColor="#C5CDCA"
+                android:textColor="#BAC9DA"
                 android:textSize="10sp" />
 
             <TextView
@@ -128,21 +128,8 @@
                 android:layout_height="wrap_content"
                 android:text="—"
                 android:textColor="#FFFFFF"
-                android:textSize="16sp"
+                android:textSize="19sp"
                 android:textStyle="bold" />
         </LinearLayout>
-
     </LinearLayout>
-
-    <!-- Trạng thái pin -->
-    <TextView
-        android:id="@+id/notification_total"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:paddingTop="12dp"
-        android:text="Đang chờ dữ liệu pin"
-        android:textColor="#5BE691"
-        android:textSize="12sp" />
-
 </LinearLayout>
