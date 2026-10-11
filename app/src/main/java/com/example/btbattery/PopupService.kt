@@ -1,4 +1,3 @@
-
 package com.example.btbattery
 
 import android.app.Notification
@@ -33,6 +32,8 @@ class PopupService : Service() {
     }
 
     private var deviceName = "SoundPEATS PearlClip Pro"
+
+    // Giữ dữ liệu pin gần nhất trong bộ nhớ service.
     private var batteryLevel = -1
     private var leftBattery = -1
     private var rightBattery = -1
@@ -71,7 +72,6 @@ class PopupService : Service() {
                 ""
             }
 
-            // Chỉ xử lý tai nghe mục tiêu, tránh nhầm với thiết bị Bluetooth khác.
             val targetName = deviceName.lowercase()
             val name = remoteName.lowercase()
 
@@ -179,8 +179,10 @@ class PopupService : Service() {
                     receivedBattery = true
                 }
 
-            if (receivedBattery) {
-                isDeviceConnected = true
+            // Chỉ dùng dữ liệu pin để đánh dấu kết nối khi chưa có
+            // sự kiện ngắt kết nối. Không tự kết nối lại sau khi ngắt.
+            if (receivedBattery && isDeviceConnected) {
+                refreshNotification()
             }
         }
 
@@ -232,15 +234,20 @@ class PopupService : Service() {
         }
     }
 
+    /**
+     * Khi ngắt kết nối, gửi -1 sang widget để widget không còn
+     * hiển thị các mức pin cũ như thể đó là dữ liệu hiện tại.
+     * Dữ liệu gốc vẫn được giữ trong các biến của service.
+     */
     private fun updateWidget() {
         try {
             BatteryWidgetProvider.persistAndUpdate(
                 context = this,
                 deviceName = deviceName,
-                left = leftBattery,
-                right = rightBattery,
-                caseBattery = caseBattery,
-                total = batteryLevel,
+                left = if (isDeviceConnected) leftBattery else -1,
+                right = if (isDeviceConnected) rightBattery else -1,
+                caseBattery = if (isDeviceConnected) caseBattery else -1,
+                total = if (isDeviceConnected) batteryLevel else -1,
                 connected = isDeviceConnected
             )
         } catch (e: Exception) {
@@ -274,6 +281,9 @@ class PopupService : Service() {
     private fun batteryText(value: Int): String =
         if (value in 0..100) "$value%" else "—"
 
+    private fun visibleBatteryText(value: Int): String =
+        if (isDeviceConnected) batteryText(value) else "—"
+
     private fun buildNotification(): Notification {
         val nightMode =
             (resources.configuration.uiMode and
@@ -302,6 +312,7 @@ class PopupService : Service() {
                 PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Thông báo thu gọn.
         val compactContent = RemoteViews(
             packageName,
             R.layout.notification_battery_compact
@@ -326,11 +337,11 @@ class PopupService : Service() {
                 )
                 setTextViewText(
                     R.id.notification_case,
-                    "L ${batteryText(leftBattery)}"
+                    "Hộp  —"
                 )
                 setTextViewText(
                     R.id.notification_right,
-                    "R ${batteryText(rightBattery)}"
+                    "R  —"
                 )
             }
 
@@ -339,6 +350,7 @@ class PopupService : Service() {
             setTextColor(R.id.notification_right, primaryTextColor)
         }
 
+        // Thông báo mở rộng.
         val expandedContent = RemoteViews(
             packageName,
             R.layout.notification_battery
@@ -350,15 +362,15 @@ class PopupService : Service() {
 
             setTextViewText(
                 R.id.notification_left,
-                batteryText(leftBattery)
+                visibleBatteryText(leftBattery)
             )
             setTextViewText(
                 R.id.notification_case,
-                batteryText(caseBattery)
+                visibleBatteryText(caseBattery)
             )
             setTextViewText(
                 R.id.notification_right,
-                batteryText(rightBattery)
+                visibleBatteryText(rightBattery)
             )
 
             setTextColor(
@@ -403,6 +415,7 @@ class PopupService : Service() {
 
         val summary = when {
             !isDeviceConnected -> "Đã ngắt kết nối Bluetooth"
+
             leftBattery in 0..100 ||
                 rightBattery in 0..100 ||
                 caseBattery in 0..100 -> {
@@ -410,8 +423,10 @@ class PopupService : Service() {
                     "Hộp ${batteryText(caseBattery)} · " +
                     "R ${batteryText(rightBattery)}"
             }
+
             batteryLevel in 0..100 ->
                 "Pin Bluetooth: ${batteryText(batteryLevel)}"
+
             else -> "Đang chờ dữ liệu pin"
         }
 
@@ -452,6 +467,7 @@ class PopupService : Service() {
                     e
                 )
             }
+
             receiverRegistered = false
         }
 
