@@ -64,9 +64,18 @@ class PopupService : Service() {
                 .takeIf { it in 0..100 }
                 ?.let { caseBattery = it }
         }
+       BatteryWidgetProvider.persistAndUpdate(
+    context = this,
+    deviceName = deviceName,
+    left = leftBattery,
+    right = rightBattery,
+    caseBattery = caseBattery,
+    total = batteryLevel
+)
 
-        val notification = buildNotification()
+val notification = buildNotification()
 
+        
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
