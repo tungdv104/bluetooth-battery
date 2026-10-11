@@ -1,5 +1,8 @@
 package com.example.btbattery
 
+import android.graphics.Color
+import android.util.TypedValue
+import android.content.res.Configuration
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -23,7 +26,21 @@ class PopupService : Service() {
         const val EXTRA_RIGHT_BATTERY = "right_battery"
         const val EXTRA_CASE_BATTERY = "case_battery"
     }
-
+    private fun resolveThemeColor(
+    attr: Int,
+    fallback: Int
+    ): Int {
+    val value = TypedValue()
+    return if (
+        theme.resolveAttribute(attr, value, true) &&
+        value.type in TypedValue.TYPE_FIRST_COLOR_INT..
+            TypedValue.TYPE_LAST_COLOR_INT
+    ) {
+        value.data
+    } else {
+        fallback
+    }
+    }
     private var deviceName = "SoundPEATS PearlClip Pro"
     private var batteryLevel = -1
     private var leftBattery = -1
@@ -131,30 +148,67 @@ class PopupService : Service() {
                 PendingIntent.FLAG_IMMUTABLE
         )
 
-        val content = android.widget.RemoteViews(
-            packageName,
-            R.layout.notification_battery
-        ).apply {
-            setTextViewText(
-                R.id.notification_device_name,
-                deviceName
-            )
+       
+val nightMode =
+    (resources.configuration.uiMode and
+        Configuration.UI_MODE_NIGHT_MASK) ==
+        Configuration.UI_MODE_NIGHT_YES
 
-            setTextViewText(
-                R.id.notification_left,
-                batteryText(leftBattery)
-            )
+val primaryTextColor = if (nightMode) {
+    Color.WHITE
+} else {
+    Color.BLACK
+}
 
-            setTextViewText(
-                R.id.notification_case,
-                batteryText(caseBattery)
-            )
+val secondaryTextColor = if (nightMode) {
+    Color.LTGRAY
+} else {
+    Color.DKGRAY
+}
 
-            setTextViewText(
-                R.id.notification_right,
-                batteryText(rightBattery)
-            )
-        }
+val content = android.widget.RemoteViews(
+    packageName,
+    R.layout.notification_battery
+).apply {
+    setTextViewText(
+        R.id.notification_device_name,
+        deviceName
+    )
+
+    setTextViewText(
+        R.id.notification_left,
+        batteryText(leftBattery)
+    )
+
+    setTextViewText(
+        R.id.notification_case,
+        batteryText(caseBattery)
+    )
+
+    setTextViewText(
+        R.id.notification_right,
+        batteryText(rightBattery)
+    )
+
+    // Chữ chính: trắng ở theme tối, đen ở theme sáng.
+    setTextColor(
+        R.id.notification_device_name,
+        primaryTextColor
+    )
+    setTextColor(
+        R.id.notification_left,
+        primaryTextColor
+    )
+    setTextColor(
+        R.id.notification_case,
+        primaryTextColor
+    )
+    setTextColor(
+        R.id.notification_right,
+        primaryTextColor
+    )
+}
+
 
         val summary = if (
             leftBattery in 0..100 ||
