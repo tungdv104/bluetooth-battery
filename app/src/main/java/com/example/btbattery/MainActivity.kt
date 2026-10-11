@@ -1,6 +1,7 @@
 
 package com.example.btbattery
 
+import android.app.NotificationManager
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -39,7 +40,7 @@ class MainActivity : AppCompatActivity() {
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action != android.bluetooth.device.action.BATTERY_LEVEL_CHANGED) {
+            if (intent.action != "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED") {
                 return
             }
 
@@ -54,7 +55,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val level = intent.getIntExtra(
-                android.bluetooth.device.extra.BATTERY_LEVEL, -1
+                ""android.bluetooth.device.extra.BATTERY_LEVEL"", -1
             )
 
             if (device != null && level in 0..100) {
@@ -108,7 +109,7 @@ class MainActivity : AppCompatActivity() {
 
         if (!receiverRegistered) {
             val filter = IntentFilter(
-                android.bluetooth.device.action.BATTERY_LEVEL_CHANGED
+                "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
             )
             ContextCompat.registerReceiver(
                 this,
@@ -172,11 +173,11 @@ class MainActivity : AppCompatActivity() {
         })
 
         permissionStatus = TextView(this).apply {
-            textSize = 13f
-            setTextColor(secondary)
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = rounded(Color.rgb(25, 29, 32), 14)
-        }
+    textSize = 13f
+    setTextColor(secondary)
+    setPadding(dp(14), dp(12), dp(14), dp(12))
+    this.background = rounded(Color.rgb(25, 29, 32), 14)
+}
         val statusParams = LinearLayout.LayoutParams(
             -1, -2
         ).apply {
@@ -217,8 +218,8 @@ class MainActivity : AppCompatActivity() {
         if (!::container.isInitialized) return
 
         // Giữ lại phần đầu giao diện và xóa các thẻ thiết bị cũ.
-        while (container.childCount > 5) {
-            container.removeViewAt(5)
+        while (container.childCount > 7) {
+            container.removeViewAt(7)
         }
 
         val adapter = bluetoothAdapter
