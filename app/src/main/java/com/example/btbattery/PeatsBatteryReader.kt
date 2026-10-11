@@ -227,13 +227,16 @@ private fun readMatchingReply(
                     bytes[start + 8] == 0x00
 
                 if (matches) {
-                    val value = bytes[start + 9]
-                    logRaw(bytes)
+                    val rawValue = bytes[start + 9]
+val value = rawValue and 0x7F
 
-                    if (value in 0..100) {
-                        Log.i(TAG, "Valid battery command=${command.toString(16)} value=$value")
-                        return value
-                    }
+if (value in 0..100) {
+    Log.i(
+        TAG,
+        "Battery command=$command raw=0x${rawValue.toString(16)} decoded=$value"
+    )
+    return value
+}
 
                     Log.w(
                         TAG,
