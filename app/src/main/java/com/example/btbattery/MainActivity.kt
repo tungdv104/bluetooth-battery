@@ -18,28 +18,16 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.util.Log
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 class MainActivity : Activity() {
-
-    companion object {
-        private const val REQUEST_BT = 501
-        private const val REQUEST_NOTIFICATIONS = 502
-
-        private const val ACTION_BATTERY_CHANGED =
-            "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
-
-        private const val EXTRA_BATTERY_LEVEL =
-            "android.bluetooth.device.extra.BATTERY_LEVEL"
-    }
 
     private lateinit var deviceContainer: LinearLayout
     private lateinit var statusText: TextView
@@ -65,6 +53,17 @@ class MainActivity : Activity() {
     private val green = Color.rgb(111, 240, 177)
     private val muted = Color.rgb(164, 180, 201)
 
+    companion object {
+        private const val REQUEST_BT = 501
+        private const val REQUEST_NOTIFICATIONS = 502
+
+        private const val ACTION_BATTERY_CHANGED =
+            "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
+
+        private const val EXTRA_BATTERY_LEVEL =
+            "android.bluetooth.device.extra.BATTERY_LEVEL"
+    }
+
     private val bluetoothReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent == null) return
@@ -75,8 +74,11 @@ class MainActivity : Activity() {
 
                     if (device != null) {
                         connectedDevices[device.address] = device
-                        readPeatsBatteryIfSupported(device, force = true)
-                        sendNotification(device, getBatteryLevel(device))
+                        readPeatsBatteryIfSupported(device)
+                        sendNotification(
+                            device,
+                            getBatteryLevel(device)
+                        )
                     }
 
                     refreshConnectedDevices()
@@ -90,7 +92,6 @@ class MainActivity : Activity() {
                         batteryLevels.remove(device.address)
                         peatsBatteryStates.remove(device.address)
                         peatsLastReadAt.remove(device.address)
-                        peatsReadInProgress.remove(device.address)
                     }
 
                     refreshUI()
@@ -147,7 +148,6 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         registerBluetoothReceiver()
-        startBackgroundMonitor()
         refreshConnectedDevices()
     }
 
@@ -159,71 +159,8 @@ class MainActivity : Activity() {
                 unregisterReceiver(bluetoothReceiver)
             } catch (_: Exception) {
             }
+
             receiverRegistered = false
-        }
-    }
-
-    // --------------------------------------------------
-    // DỊCH VỤ NỀN
-    // --------------------------------------------------
-
-    private fun startBackgroundMonitor() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            !hasPermission(Manifest.permission.BLUETOOTH_CONNECT)
-        ) {
-            return
-        }
-
-        try {
-            val intent = Intent(this, PopupService::class.java)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
-
-            Log.i("BTBattery", "Đã yêu cầu khởi động PopupService")
-        } catch (e: Exception) {
-            Log.e("BTBattery", "Không khởi động được dịch vụ nền", e)
-
-            if (::statusText.isInitialized) {
-                statusText.text = "Không khởi động được dịch vụ nền"
-            }
-        }
-    }
-
-    // --------------------------------------------------
-    // QUYỀN POPUP NỔI
-    // --------------------------------------------------
-
-    private fun openOverlayPermissionSettings() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-            !Settings.canDrawOverlays(this)
-        ) {
-            try {
-                val intent = Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName")
-                )
-                startActivity(intent)
-            } catch (e: Exception) {
-                Log.e("BTBattery", "Không mở được cài đặt popup", e)
-                Toast.makeText(
-                    this,
-                    "Không mở được cài đặt quyền popup",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        } else {
-            Toast.makeText(
-                this,
-                "Đã có quyền popup nổi",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            startBackgroundMonitor()
-            refreshConnectedDevices(forceRead = true)
         }
     }
 
@@ -235,6 +172,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(18), dp(20), dp(12))
+
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
                 intArrayOf(
@@ -259,10 +197,17 @@ class MainActivity : Activity() {
             setPadding(dp(2), dp(8), dp(2), dp(20))
         }
 
-        header.addView(text("BT BATTERY", 28f, Color.WHITE, true))
+        header.addView(
+            text("BT BATTERY", 28f, Color.WHITE, true)
+        )
 
         header.addView(
-            text("SMART BATTERY MONITOR", 10f, accent, true).apply {
+            text(
+                "SMART BATTERY MONITOR",
+                10f,
+                accent,
+                true
+            ).apply {
                 letterSpacing = 0.16f
                 setPadding(0, dp(5), 0, 0)
             }
@@ -270,6 +215,7 @@ class MainActivity : Activity() {
 
         content.addView(header)
 
+        // Trạng thái ứng dụng, không hiển thị PIN TỔNG.
         val statusCard = glassCard(22).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(17), dp(16), dp(17), dp(16))
@@ -293,10 +239,14 @@ class MainActivity : Activity() {
         statusCard.addView(statusText)
         statusCard.addView(totalText)
 
-        content.addView(statusCard, matchWrap().apply {
-            bottomMargin = dp(18)
-        })
+        content.addView(
+            statusCard,
+            matchWrap().apply {
+                bottomMargin = dp(18)
+            }
+        )
 
+        // Các nút thao tác nhanh.
         val actionCard = glassCard(22).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(14))
@@ -322,22 +272,8 @@ class MainActivity : Activity() {
         )
 
         actionCard.addView(
-            actionButton("Cài đặt thông báo") {
+            actionButton("Cài đặt thông báo và popup") {
                 openNotificationSettings()
-            }
-        )
-
-        // Nút xin quyền hiển thị popup nổi.
-        actionCard.addView(
-            actionButton("Bật popup nổi kiểu AirPods") {
-                openOverlayPermissionSettings()
-            }
-        )
-
-        actionCard.addView(
-            actionButton("Khởi động theo dõi nền") {
-                startBackgroundMonitor()
-                statusText.text = "Đã yêu cầu khởi động theo dõi nền"
             }
         )
 
@@ -347,12 +283,20 @@ class MainActivity : Activity() {
             }
         )
 
-        content.addView(actionCard, matchWrap().apply {
-            bottomMargin = dp(22)
-        })
+        content.addView(
+            actionCard,
+            matchWrap().apply {
+                bottomMargin = dp(22)
+            }
+        )
 
         content.addView(
-            text("THIẾT BỊ CỦA BẠN", 11f, muted, true).apply {
+            text(
+                "THIẾT BỊ CỦA BẠN",
+                11f,
+                muted,
+                true
+            ).apply {
                 letterSpacing = 0.12f
                 setPadding(dp(3), 0, 0, dp(12))
             }
@@ -366,7 +310,7 @@ class MainActivity : Activity() {
 
         content.addView(
             text(
-                "Pin trái, phải và hộp sạc được đọc từ giao thức tai nghe nếu thiết bị hỗ trợ.",
+                "Pin trái, phải và hộp sạc được đọc trực tiếp từ giao thức tai nghe nếu thiết bị hỗ trợ.",
                 10f,
                 muted
             ).apply {
@@ -376,58 +320,74 @@ class MainActivity : Activity() {
         )
 
         scroll.addView(content)
-        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        root.addView(
+            scroll,
+            LinearLayout.LayoutParams(-1, 0, 1f)
+        )
+
         setContentView(root)
     }
 
-    private fun actionButton(
-        label: String,
-        onClick: () -> Unit
-    ): Button {
-        return Button(this).apply {
-            text = label
-            isAllCaps = false
-            textSize = 13f
-            setTextColor(Color.WHITE)
+    
+private fun actionButton(
+    label: String,
+    onClick: () -> Unit
+): Button {
+    return Button(this).apply {
+        text = label
+        isAllCaps = false
+        textSize = 13f
+        setTextColor(Color.WHITE)
 
-            background = GradientDrawable().apply {
-                cornerRadius = dp(16).toFloat()
-                setColor(Color.argb(105, 38, 54, 78))
-                setStroke(dp(1), Color.argb(75, 185, 220, 255))
-            }
+        // Nền kính tối, viền xanh mờ đồng bộ với thẻ pin.
+        background = GradientDrawable().apply {
+            cornerRadius = dp(16).toFloat()
+            setColor(Color.argb(105, 38, 54, 78))
+            setStroke(
+                dp(1),
+                Color.argb(75, 185, 220, 255)
+            )
+        }
 
-            backgroundTintList = null
-            stateListAnimator = null
-            elevation = dp(1).toFloat()
-            minimumHeight = dp(48)
-            setPadding(dp(14), dp(10), dp(14), dp(10))
-            gravity = Gravity.CENTER
+        // Bỏ màu nền và hiệu ứng mặc định của Button Android.
+        backgroundTintList = null
+        stateListAnimator = null
+        elevation = dp(1).toFloat()
 
-            setOnClickListener { onClick() }
+        minimumHeight = dp(48)
+        setPadding(dp(14), dp(10), dp(14), dp(10))
+        gravity = Gravity.CENTER
 
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = dp(8)
-            }
+        setOnClickListener {
+            onClick()
+        }
+
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = dp(8)
         }
     }
+}
+
 
     // --------------------------------------------------
     // QUYỀN ỨNG DỤNG
     // --------------------------------------------------
-
-    private fun hasPermission(permission: String): Boolean {
-        return ContextCompat.checkSelfPermission(
-            this,
-            permission
-        ) == PackageManager.PERMISSION_GRANTED
-    }
 
     private fun requestBluetoothPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val needed = arrayOf(
                 Manifest.permission.BLUETOOTH_CONNECT,
                 Manifest.permission.BLUETOOTH_SCAN
-            ).filterNot { hasPermission(it) }
+            ).filter {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    it
+                ) != PackageManager.PERMISSION_GRANTED
+            }
 
             if (needed.isNotEmpty()) {
                 ActivityCompat.requestPermissions(
@@ -439,14 +399,16 @@ class MainActivity : Activity() {
             }
         }
 
-        startBackgroundMonitor()
-        registerBluetoothReceiver()
         refreshConnectedDevices(forceRead = true)
     }
 
     private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            !hasPermission(Manifest.permission.POST_NOTIFICATIONS)
+        if (
+            Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
         ) {
             ActivityCompat.requestPermissions(
                 this,
@@ -462,7 +424,10 @@ class MainActivity : Activity() {
         try {
             val intent = if (Build.VERSION.SDK_INT >= 26) {
                 Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    putExtra(
+                        Settings.EXTRA_APP_PACKAGE,
+                        packageName
+                    )
                 }
             } else {
                 Intent(
@@ -490,15 +455,13 @@ class MainActivity : Activity() {
 
         when (requestCode) {
             REQUEST_BT -> {
-                val granted = grantResults.isNotEmpty() &&
+                if (
+                    grantResults.isNotEmpty() &&
                     grantResults.all {
                         it == PackageManager.PERMISSION_GRANTED
                     }
-
-                if (granted) {
+                ) {
                     statusText.text = "Đã cấp quyền Bluetooth"
-                    startBackgroundMonitor()
-                    registerBluetoothReceiver()
                     refreshConnectedDevices(forceRead = true)
                 } else {
                     statusText.text = "Cần cấp quyền Bluetooth"
@@ -506,9 +469,13 @@ class MainActivity : Activity() {
             }
 
             REQUEST_NOTIFICATIONS -> {
-                val granted = Build.VERSION.SDK_INT < 33 ||
-                    (grantResults.isNotEmpty() &&
-                        grantResults[0] == PackageManager.PERMISSION_GRANTED)
+                val granted =
+                    Build.VERSION.SDK_INT < 33 ||
+                    (
+                        grantResults.isNotEmpty() &&
+                        grantResults[0] ==
+                            PackageManager.PERMISSION_GRANTED
+                    )
 
                 statusText.text = if (granted) {
                     "Đã cấp quyền thông báo"
@@ -517,7 +484,6 @@ class MainActivity : Activity() {
                 }
 
                 if (granted) {
-                    startBackgroundMonitor()
                     refreshConnectedDevices()
                 } else {
                     openNotificationSettings()
@@ -532,12 +498,6 @@ class MainActivity : Activity() {
 
     private fun registerBluetoothReceiver() {
         if (receiverRegistered) return
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            !hasPermission(Manifest.permission.BLUETOOTH_CONNECT)
-        ) {
-            return
-        }
 
         val filter = IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
@@ -576,20 +536,21 @@ class MainActivity : Activity() {
     ) {
         val name = getDeviceName(device).lowercase()
 
-        val isSoundPeats =
+        val likelySoundPeats =
             name.contains("soundpeats") ||
             name.contains("pearlclip") ||
             name.contains("pearl clip") ||
             name.contains("pearclip")
 
-        if (!isSoundPeats) return
+        if (!likelySoundPeats) return
 
         val address = device.address
         val now = System.currentTimeMillis()
 
         if (address in peatsReadInProgress) return
 
-        if (!force &&
+        if (
+            !force &&
             now - (peatsLastReadAt[address] ?: 0L) < 15_000L
         ) {
             return
@@ -598,38 +559,35 @@ class MainActivity : Activity() {
         peatsReadInProgress.add(address)
         peatsLastReadAt[address] = now
 
-        try {
-            PeatsBatteryReader(device).read { state, error ->
-                runOnUiThread {
-                    peatsReadInProgress.remove(address)
+        PeatsBatteryReader(device).read { state, error ->
+            runOnUiThread {
+                peatsReadInProgress.remove(address)
 
-                    if (state != null && state.hasAnyValue) {
-                        peatsBatteryStates[address] = state
+                if (state != null && state.hasAnyValue) {
+                    peatsBatteryStates[address] = state
 
-                        Log.i(
-                            "PeatsBatteryReader",
-                            "Battery $name: L=${state.left}, " +
-                                "R=${state.right}, case=${state.case}"
-                        )
+                    Log.i(
+                        "PeatsBatteryReader",
+                        "Battery result for $name: " +
+                            "L=${state.left}, " +
+                            "R=${state.right}, " +
+                            "case=${state.case}"
+                    )
 
-                        refreshUI()
-                    } else {
-                        Log.w(
-                            "PeatsBatteryReader",
-                            "Không đọc được pin $name: " +
-                                (error ?: "unknown error")
-                        )
+                    // Vẽ lại các ô pin và cập nhật popup bằng dữ liệu mới.
+                    refreshUI()
+                } else {
+                    Log.w(
+                        "PeatsBatteryReader",
+                        "Could not read $name: ${error ?: "unknown error"}"
+                    )
 
-                        if (::totalText.isInitialized) {
-                            totalText.text =
-                                "Chưa đọc được pin riêng; thử làm mới lại"
-                        }
+                    if (::totalText.isInitialized) {
+                        totalText.text =
+                            "Chưa đọc được pin riêng; thử làm mới lại"
                     }
                 }
             }
-        } catch (e: Exception) {
-            peatsReadInProgress.remove(address)
-            Log.e("PeatsBatteryReader", "Lỗi đọc pin SoundPEATS", e)
         }
     }
 
@@ -638,7 +596,9 @@ class MainActivity : Activity() {
     // --------------------------------------------------
 
     @Suppress("MissingPermission")
-    private fun refreshConnectedDevices(forceRead: Boolean = false) {
+    private fun refreshConnectedDevices(
+        forceRead: Boolean = false
+    ) {
         if (refreshing) return
 
         val adapter = bluetoothAdapter ?: run {
@@ -660,6 +620,7 @@ class MainActivity : Activity() {
             adapter.getProfileProxy(
                 this,
                 object : BluetoothProfile.ServiceListener {
+
                     override fun onServiceConnected(
                         profile: Int,
                         proxy: BluetoothProfile
@@ -684,7 +645,11 @@ class MainActivity : Activity() {
 
                             refreshUI()
                         } catch (e: Exception) {
-                            Log.e("BTBattery", "Lỗi làm mới thiết bị", e)
+                            Log.e(
+                                "BTBattery",
+                                "Lỗi khi làm mới thiết bị",
+                                e
+                            )
                         } finally {
                             refreshing = false
 
@@ -714,22 +679,26 @@ class MainActivity : Activity() {
 
     @Suppress("MissingPermission", "DEPRECATION")
     private fun getBatteryLevel(device: BluetoothDevice): Int {
-        return try {
-            val method = device.javaClass.getMethod("getBatteryLevel")
+        try {
+            val method =
+                device.javaClass.getMethod("getBatteryLevel")
+
             val level = method.invoke(device) as? Int ?: -1
 
             if (level in 0..100) {
                 batteryLevels[device.address] = level
-                level
-            } else {
-                batteryLevels[device.address] ?: -1
+                return level
             }
         } catch (_: Exception) {
-            batteryLevels[device.address] ?: -1
+            // Một số ROM không cung cấp API pin Bluetooth này.
         }
+
+        return batteryLevels[device.address] ?: -1
     }
 
-    private fun getDeviceFromIntent(intent: Intent): BluetoothDevice? {
+    private fun getDeviceFromIntent(
+        intent: Intent
+    ): BluetoothDevice? {
         return try {
             if (Build.VERSION.SDK_INT >= 33) {
                 intent.getParcelableExtra(
@@ -738,7 +707,9 @@ class MainActivity : Activity() {
                 )
             } else {
                 @Suppress("DEPRECATION")
-                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                intent.getParcelableExtra(
+                    BluetoothDevice.EXTRA_DEVICE
+                )
             }
         } catch (_: Exception) {
             null
@@ -746,7 +717,7 @@ class MainActivity : Activity() {
     }
 
     // --------------------------------------------------
-    // GỬI DỮ LIỆU CHO POPUPSERVICE
+    // CẬP NHẬT POPUP THÔNG BÁO
     // --------------------------------------------------
 
     private fun sendNotification(
@@ -755,20 +726,30 @@ class MainActivity : Activity() {
     ) {
         val peats = peatsBatteryStates[device.address]
 
-        val intent = Intent(this, PopupService::class.java).apply {
-            putExtra(PopupService.EXTRA_DEVICE_NAME, getDeviceName(device))
+        val serviceIntent = Intent(
+            this,
+            PopupService::class.java
+        ).apply {
+            putExtra(
+                PopupService.EXTRA_DEVICE_NAME,
+                getDeviceName(device)
+            )
+
             putExtra(
                 PopupService.EXTRA_BATTERY_LEVEL,
                 level.takeIf { it in 0..100 } ?: -1
             )
+
             putExtra(
                 PopupService.EXTRA_LEFT_BATTERY,
                 peats?.left?.takeIf { it in 0..100 } ?: -1
             )
+
             putExtra(
                 PopupService.EXTRA_RIGHT_BATTERY,
                 peats?.right?.takeIf { it in 0..100 } ?: -1
             )
+
             putExtra(
                 PopupService.EXTRA_CASE_BATTERY,
                 peats?.case?.takeIf { it in 0..100 } ?: -1
@@ -777,23 +758,28 @@ class MainActivity : Activity() {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
+                startForegroundService(serviceIntent)
             } else {
-                startService(intent)
+                startService(serviceIntent)
             }
         } catch (e: Exception) {
-            Log.e("BTBattery", "Không cập nhật được PopupService", e)
+            Log.e(
+                "BTBattery",
+                "Không cập nhật được popup",
+                e
+            )
         }
     }
 
     // --------------------------------------------------
-    // HIỂN THỊ THIẾT BỊ VÀ PIN
+    // VẼ GIAO DIỆN PIN
     // --------------------------------------------------
 
     private fun refreshUI() {
         if (!::deviceContainer.isInitialized) return
 
         deviceContainer.removeAllViews()
+
         val devices = connectedDevices.values.toList()
 
         if (devices.isEmpty()) {
@@ -860,11 +846,21 @@ class MainActivity : Activity() {
             }
 
             item.addView(
-                text(getDeviceName(device), 18f, Color.WHITE, true)
+                text(
+                    getDeviceName(device),
+                    18f,
+                    Color.WHITE,
+                    true
+                )
             )
 
             item.addView(
-                text("●  ĐÃ KẾT NỐI", 10f, green, true).apply {
+                text(
+                    "●  ĐÃ KẾT NỐI",
+                    10f,
+                    green,
+                    true
+                ).apply {
                     setPadding(0, dp(7), 0, dp(17))
                     letterSpacing = 0.07f
                 }
@@ -902,27 +898,32 @@ class MainActivity : Activity() {
             item.addView(row)
 
             item.addView(
-                text(device.address, 10f, muted).apply {
+                text(
+                    device.address,
+                    10f,
+                    muted
+                ).apply {
                     gravity = Gravity.CENTER
                     setPadding(0, dp(12), 0, 0)
                 }
             )
 
-            deviceContainer.addView(item, matchWrap().apply {
-                bottomMargin = dp(14)
-            })
+            deviceContainer.addView(
+                item,
+                matchWrap().apply {
+                    bottomMargin = dp(14)
+                }
+            )
 
+            // Luôn chuyển trạng thái pin riêng hiện có sang popup.
             sendNotification(device, level ?: -1)
         }
 
-        totalText.text =
-            if (devices.any {
-                peatsBatteryStates[it.address]?.hasAnyValue == true
-            }) {
-                "Đã nhận dữ liệu pin tai nghe"
-            } else {
-                "Đang chờ dữ liệu pin riêng từ tai nghe"
-            }
+        totalText.text = if (peatsBatteryStates.isNotEmpty()) {
+            "Đã nhận dữ liệu pin tai nghe"
+        } else {
+            "Đang chờ dữ liệu pin riêng từ tai nghe"
+        }
     }
 
     private fun batteryTile(
@@ -975,11 +976,17 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun rounded(color: Int, radius: Int): GradientDrawable {
+    private fun rounded(
+        color: Int,
+        radius: Int
+    ): GradientDrawable {
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = dp(radius).toFloat()
-            setStroke(dp(1), Color.argb(45, 185, 220, 255))
+            setStroke(
+                dp(1),
+                Color.argb(45, 185, 220, 255)
+            )
         }
     }
 
@@ -993,16 +1000,21 @@ class MainActivity : Activity() {
             text = value
             textSize = size
             setTextColor(color)
-            if (bold) setTypeface(null, Typeface.BOLD)
+
+            if (bold) {
+                setTypeface(null, Typeface.BOLD)
+            }
         }
     }
 
-    private fun matchWrap() = LinearLayout.LayoutParams(-1, -2)
+    private fun matchWrap() =
+        LinearLayout.LayoutParams(-1, -2)
 
     @Suppress("MissingPermission")
     private fun getDeviceName(device: BluetoothDevice): String {
         return try {
-            device.name?.takeIf { it.isNotBlank() } ?: "Tai nghe Bluetooth"
+            device.name?.takeIf { it.isNotBlank() }
+                ?: "Tai nghe Bluetooth"
         } catch (_: SecurityException) {
             "Tai nghe Bluetooth"
         }
