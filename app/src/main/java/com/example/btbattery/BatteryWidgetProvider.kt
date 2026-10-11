@@ -18,10 +18,11 @@ class BatteryWidgetProvider : AppWidgetProvider() {
         private const val KEY_RIGHT = "right_battery"
         private const val KEY_CASE = "case_battery"
         private const val KEY_TOTAL = "battery_level"
+        private const val KEY_CONNECTED = "device_connected"
 
         /**
-         * Lưu dữ liệu mới và cập nhật widget.
-         * Được gọi từ PopupService khi nhận dữ liệu pin.
+         * Lưu trạng thái pin và kết nối, sau đó cập nhật widget.
+         * Được gọi từ PopupService.
          */
         fun persistAndUpdate(
             context: Context,
@@ -29,7 +30,8 @@ class BatteryWidgetProvider : AppWidgetProvider() {
             left: Int,
             right: Int,
             caseBattery: Int,
-            total: Int
+            total: Int,
+            connected: Boolean = true
         ) {
             context.getSharedPreferences(
                 PREFS,
@@ -40,8 +42,16 @@ class BatteryWidgetProvider : AppWidgetProvider() {
                 .putInt(KEY_RIGHT, right)
                 .putInt(KEY_CASE, caseBattery)
                 .putInt(KEY_TOTAL, total)
+                .putBoolean(KEY_CONNECTED, connected)
                 .apply()
 
+            updateWidgets(context)
+        }
+
+        /**
+         * Cập nhật tất cả widget đang được đặt trên màn hình.
+         */
+        private fun updateWidgets(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(
                 context,
@@ -50,8 +60,11 @@ class BatteryWidgetProvider : AppWidgetProvider() {
             val ids = manager.getAppWidgetIds(component)
 
             if (ids.isNotEmpty()) {
-                val provider = BatteryWidgetProvider()
-                provider.onUpdate(context, manager, ids)
+                BatteryWidgetProvider().onUpdate(
+                    context,
+                    manager,
+                    ids
+                )
             }
         }
 
@@ -74,21 +87,22 @@ class BatteryWidgetProvider : AppWidgetProvider() {
             Context.MODE_PRIVATE
         )
 
+        val name = prefs.getString(
+            KEY_NAME,
+            "SoundPEATS PearlClip Pro"
+        ) ?: "SoundPEATS PearlClip Pro"
+
+        val left = prefs.getInt(KEY_LEFT, -1)
+        val right = prefs.getInt(KEY_RIGHT, -1)
+        val caseBattery = prefs.getInt(KEY_CASE, -1)
+        val total = prefs.getInt(KEY_TOTAL, -1)
+        val connected = prefs.getBoolean(KEY_CONNECTED, false)
+
         for (appWidgetId in appWidgetIds) {
             val views = RemoteViews(
                 context.packageName,
                 R.layout.widget_battery
             )
-
-            val name = prefs.getString(
-                KEY_NAME,
-                "SoundPEATS PearlClip Pro"
-            ) ?: "SoundPEATS PearlClip Pro"
-
-            val left = prefs.getInt(KEY_LEFT, -1)
-            val right = prefs.getInt(KEY_RIGHT, -1)
-            val caseBattery = prefs.getInt(KEY_CASE, -1)
-            val total = prefs.getInt(KEY_TOTAL, -1)
 
             views.setTextViewText(
                 R.id.widget_device_name,
@@ -99,10 +113,12 @@ class BatteryWidgetProvider : AppWidgetProvider() {
                 R.id.widget_left_value,
                 batteryText(left)
             )
+
             views.setTextViewText(
                 R.id.widget_right_value,
                 batteryText(right)
             )
+
             views.setTextViewText(
                 R.id.widget_case_value,
                 batteryText(caseBattery)
@@ -114,12 +130,14 @@ class BatteryWidgetProvider : AppWidgetProvider() {
                 safeProgress(left),
                 false
             )
+
             views.setProgressBar(
                 R.id.widget_right_progress,
                 100,
                 safeProgress(right),
                 false
             )
+
             views.setProgressBar(
                 R.id.widget_case_progress,
                 100,
@@ -133,9 +151,10 @@ class BatteryWidgetProvider : AppWidgetProvider() {
                 caseBattery in 0..100
 
             val status = when {
-                hasSeparateBattery -> "Pin tai nghe"
-                total in 0..100 -> "Pin Bluetooth: $total%"
-                else -> "Đang chờ dữ liệu pin"
+                !connected -> "Đã ngắt kết nối"
+                hasSeparateBattery -> "Đang kết nối · Pin tai nghe"
+                total in 0..100 -> "Đang kết nối · Pin Bluetooth: $total%"
+                else -> "Đang kết nối · Đang chờ dữ liệu pin"
             }
 
             views.setTextViewText(
