@@ -329,17 +329,49 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
-    private fun actionButton(
-        label: String,
-        onClick: () -> Unit
-    ): Button {
-        return Button(this).apply {
-            text = label
-            isAllCaps = false
-            textSize = 13f
-            setOnClickListener { onClick() }
+    
+private fun actionButton(
+    label: String,
+    onClick: () -> Unit
+): Button {
+    return Button(this).apply {
+        text = label
+        isAllCaps = false
+        textSize = 13f
+        setTextColor(Color.WHITE)
+
+        // Nền kính tối, viền xanh mờ đồng bộ với thẻ pin.
+        background = GradientDrawable().apply {
+            cornerRadius = dp(16).toFloat()
+            setColor(Color.argb(105, 38, 54, 78))
+            setStroke(
+                dp(1),
+                Color.argb(75, 185, 220, 255)
+            )
+        }
+
+        // Bỏ màu nền và hiệu ứng mặc định của Button Android.
+        backgroundTintList = null
+        stateListAnimator = null
+        elevation = dp(1).toFloat()
+
+        minimumHeight = dp(48)
+        setPadding(dp(14), dp(10), dp(14), dp(10))
+        gravity = Gravity.CENTER
+
+        setOnClickListener {
+            onClick()
+        }
+
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = dp(8)
         }
     }
+}
+
 
     // --------------------------------------------------
     // QUYỀN ỨNG DỤNG
