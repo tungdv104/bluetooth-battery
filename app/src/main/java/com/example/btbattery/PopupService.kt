@@ -35,16 +35,17 @@ class PopupService : Service() {
         flags: Int,
         startId: Int
     ): Int {
-        intent?.let {
-            deviceName = it.getStringExtra(EXTRA_DEVICE_NAME)
-                ?.takeIf { name -> name.isNotBlank() }
+        if (intent != null) {
+            deviceName = intent
+                .getStringExtra(EXTRA_DEVICE_NAME)
+                ?.takeIf { it.isNotBlank() }
                 ?: deviceName
 
-            val incomingLevel = it.getIntExtra(
+            val incomingLevel = intent.getIntExtra(
                 EXTRA_BATTERY_LEVEL, -1
             )
 
-            // Không ghi đè pin hợp lệ bằng -1.
+            // Không ghi đè dữ liệu hợp lệ bằng -1.
             if (incomingLevel in 0..100) {
                 batteryLevel = incomingLevel
             }
@@ -53,7 +54,7 @@ class PopupService : Service() {
         val notification = buildNotification()
 
         try {
-            if (Build.VERSION.SDK_INT >= 29) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
@@ -77,7 +78,6 @@ class PopupService : Service() {
             NotificationManager::class.java
         )
 
-        // Channel đã tồn tại sẽ giữ cài đặt người dùng.
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Pin Bluetooth",
@@ -110,10 +110,11 @@ class PopupService : Service() {
                 PendingIntent.FLAG_IMMUTABLE
         )
 
-        val batteryText = if (batteryLevel in 0..100) {
+        val hasBattery = batteryLevel in 0..100
+        val batteryText = if (hasBattery) {
             "$batteryLevel%"
         } else {
-            "—"
+            "Chưa có dữ liệu"
         }
 
         val content = RemoteViews(
@@ -125,35 +126,39 @@ class PopupService : Service() {
                 deviceName
             )
 
-            // Chưa có API chuẩn để đọc riêng từng bên/hộp.
-            // Giữ dấu — thay vì tự tạo phần trăm giả.
+            // Android chỉ cung cấp một mức pin tổng ở đây.
+            // Không giả lập pin riêng từng bên hoặc hộp sạc.
             setTextViewText(R.id.notification_left, "—")
             setTextViewText(R.id.notification_case, "—")
             setTextViewText(R.id.notification_right, "—")
 
             setTextViewText(
                 R.id.notification_total,
-                if (batteryLevel in 0..100) {
+                if (hasBattery) {
                     "PIN BLUETOOTH  ·  $batteryText"
                 } else {
-                    "Đang chờ dữ liệu pin"
+                    "Đang chờ dữ liệu pin từ tai nghe"
                 }
             )
         }
 
-        val summary = if (batteryLevel in 0..100) {
+        val summary = if (hasBattery) {
             "Pin Bluetooth: $batteryText"
         } else {
             "Đang theo dõi kết nối"
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setSmallIcon(
+                android.R.drawable.stat_sys_data_bluetooth
+            )
             .setContentTitle(deviceName)
             .setContentText(summary)
             .setCustomContentView(content)
             .setCustomBigContentView(content)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setStyle(
+                NotificationCompat.DecoratedCustomViewStyle()
+            )
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
